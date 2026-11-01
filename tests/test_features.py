@@ -1,0 +1,93 @@
+import numpy as np
+import pandas as pd
+import pytest
+
+from training.features import (build_matrix, location_feature, location_lookup,
+                               split_by_month, zscore_apply, zscore_fit)
+
+
+def frame(neigh, ppm2, area=100.0, month="2024-06"):
+    n = len(ppm2)
+    return pd.DataFrame({
+        "area": [area] * n, "rooms": [2] * n, "age": [5] * n,
+        "parking": [1] * n, "elevator": [1] * n, "storage": [0] * n,
+        "neighborhood": neigh, "month": [month] * n,
+        "price": [area * p / 1000 for p in ppm2],
+        "price_per_m2": ppm2,
+    })
+
+
+def test_median_ignores_held_out():
+    months = [f"2024-{m:02d}" for m in range(5, 13)]
+    df = pd.concat([frame(["a"] * 30, [10.0 + i for i in range(30)], month=m)
+                    for m in months], ignore_index=True)
+    train, _, held = split_by_month(df)
+    before = location_lookup(train)
+    df.loc[df["month"].isin(["2024-11", "2024-12"]), "price_per_m2"] = 99999.0
+    train2, _, held2 = split_by_month(df)
+    assert (held2["price_per_m2"] == 99999.0).all()
+    assert location_lookup(train2) == before
+
+
+def test_small_neighborhood_uses_fallback():
+    train = pd.concat([frame(["a"] * 29, [100.0] * 29),
+                       frame(["b"] * 30, [40.0] * 30)], ignore_index=True)
+    lookup, fallback = location_lookup(train)
+    assert "a" not in lookup and lookup["b"] == 40.0
+    q = frame(["a", "b"], [0.0, 0.0])
+    feat = location_feature(q, lookup, fallback)
+    assert feat[0] == pytest.approx(100.0 * fallback / 1000)
+    assert feat[1] == pytest.approx(100.0 * 40.0 / 1000)
+    assert location_lookup(frame(["a"] * 30, [100.0] * 30))[0]["a"] == 100.0
+
+
+def test_unknown_neighborhood_is_finite():
+    train = frame(["a"] * 30, [60.0] * 30)
+    lookup, fallback = location_lookup(train)
+    q = frame(["zzz", None], [0.0, 0.0])
+    feat = location_feature(q, lookup, fallback)
+    assert np.isfinite(feat).all()
+    assert np.allclose(feat, 100.0 * 60.0 / 1000)
+    X = build_matrix(q, lookup, fallback, ["area", "location", "location^2"])
+    assert np.isfinite(X).all()
+
+
+def test_blank_neighborhoods_in_train_do_not_break_lookup():
+    lookup, fallback = location_lookup(frame([None] * 40, [30.0] * 40))
+    assert lookup == {} and fallback == 30.0
+
+
+def test_zero_sigma_does_not_divide_by_zero():
+    X = np.array([[1.0, 5.0], [2.0, 5.0], [3.0, 5.0]])
+    mu, sigma = zscore_fit(X)
+    assert sigma[1] == 1.0
+    Z = zscore_apply(X, mu, sigma)
+    assert np.isfinite(Z).all()
+    assert np.allclose(Z[:, 1], 0.0)
+    assert np.allclose(zscore_apply(X, mu, np.array([1.0, 0.0]))[:, 1], 0.0)
+
+
+def test_build_matrix_order_and_powers():
+    df = frame(["a"] * 2, [50.0, 50.0], area=80.0)
+    X = build_matrix(df, {"a": 50.0}, 50.0,
+                     ["location^2", "area", "rooms", "area^2"])
+    assert X.shape == (2, 4)
+    assert X[0, 0] == pytest.approx(4.0 ** 2)
+    assert X[0, 1] == 80.0 and X[0, 2] == 2.0 and X[0, 3] == 6400.0
+    with pytest.raises(ValueError):
+        build_matrix(df, {}, 1.0, ["bogus"])
+
+
+def test_split_order():
+    months = [f"2024-{m:02d}" for m in range(5, 13)]
+    df = pd.concat([frame(["a"] * 3, [1.0] * 3, month=m) for m in months],
+                   ignore_index=True)
+    train, sel, held = split_by_month(df)
+    assert train["month"].max() < sel["month"].min()
+    assert sel["month"].max() < held["month"].min()
+    assert sorted(held["month"].unique()) == ["2024-11", "2024-12"]
+    assert sorted(sel["month"].unique()) == ["2024-10"]
+    assert sorted(train["month"].unique()) == months[:5]
+    assert len(train) + len(sel) + len(held) == len(df)
+    with pytest.raises(ValueError):
+        split_by_month(df[df["month"] < "2024-08"])
