@@ -23,6 +23,7 @@ _ROOM_WORDS = {
     "سه": 3,
     "چهار": 4,
     "پنج": 5,
+    "پنج یا بیشتر": 5,
 }
 
 _BEFORE_MARKER = "قبل از"
@@ -32,6 +33,8 @@ def _normalize(s) -> str:
     if s is None:
         return ""
     if isinstance(s, float) and math.isnan(s):
+        return ""
+    if type(s).__name__ == "NAType":  # pandas.NA, without importing pandas here
         return ""
     text = str(s).translate(_DIGIT_MAP).translate(_SEPARATORS).translate(_DECIMAL)
     # Normalize Arabic yeh/kaf and the zero-width non-joiner to plain forms.
@@ -51,17 +54,15 @@ def parse_persian_number(s) -> float | None:
 
 
 def parse_rooms(s) -> float | None:
-    """Parse a room-count label. 'پنج یا بیشتر' (five or more) maps to 5."""
+    """Parse a room-count label by exact match. 'پنج یا بیشتر' (five or more) maps to 5."""
     text = _normalize(s)
     if not text:
         return None
     number = parse_persian_number(text)
     if number is not None:
         return number
-    for word, value in _ROOM_WORDS.items():
-        if text.startswith(word):
-            return float(value)
-    return None
+    value = _ROOM_WORDS.get(text)
+    return None if value is None else float(value)
 
 
 def parse_year(s) -> int | None:
