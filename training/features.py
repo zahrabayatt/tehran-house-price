@@ -38,13 +38,14 @@ def location_lookup(train: pd.DataFrame, min_rows: int = 30
     """Median price_per_m2 per neighborhood, and the Tehran fallback median.
 
     Only neighborhoods with at least `min_rows` rows in `train` get an entry.
-    The fallback is the median over every row of `train`.
+    The fallback is the median over every training price, including rows whose
+    neighborhood is blank or too small for its own entry.
     """
     fallback = float(train["price_per_m2"].median())
     known = train[train["neighborhood"].notna()]
     grouped = known.groupby("neighborhood")["price_per_m2"]
     medians = grouped.median()
-    counts = grouped.size()
+    counts = grouped.count()  # rows with a usable price, not all rows
     lookup = {str(k): float(medians[k]) for k in medians.index
               if counts[k] >= min_rows}
     return lookup, fallback

@@ -91,3 +91,30 @@ def test_split_order():
     assert len(train) + len(sel) + len(held) == len(df)
     with pytest.raises(ValueError):
         split_by_month(df[df["month"] < "2024-08"])
+
+
+def test_threshold_counts_real_prices_not_rows():
+    """30 rows with one missing price are 29 usable rows, so fallback."""
+    prices = [50.0] * 29 + [np.nan]
+    train = pd.concat([frame(["a"] * 30, prices),
+                       frame(["b"] * 30, [40.0] * 30)], ignore_index=True)
+    lookup, _ = location_lookup(train)
+    assert "a" not in lookup
+    assert lookup["b"] == 40.0
+
+
+def test_fallback_is_median_of_all_training_prices():
+    """Uneven prices tell apart the median of all rows from every near miss."""
+    train = pd.concat([
+        frame(["big"] * 36, [10.0] * 36),
+        frame(["small"] * 36, [100.0] * 36),
+        frame(["rare"] * 3, [1000.0] * 3),      # below min_rows, still counted
+        frame([None] * 2, [2000.0] * 2),        # blank neighborhood, still counted
+    ], ignore_index=True)
+    lookup, fallback = location_lookup(train)
+    assert set(lookup) == {"big", "small"}
+    assert fallback == train["price_per_m2"].median() == 100.0
+    assert fallback != pytest.approx(train["price_per_m2"].mean())
+    assert fallback != pytest.approx(np.median(list(lookup.values())))  # 55.0
+    in_lookup = train[train["neighborhood"].isin(lookup)]
+    assert in_lookup["price_per_m2"].median() == 55.0  # would differ if rows were skipped
