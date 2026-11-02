@@ -97,6 +97,11 @@ test('a too-small apartment shows no price, no per-m2 figure, and keeps the brea
   await expect(result).not.toContainText(/[−-]\s?\d/);
   await expect(page.getByTestId('breakdown').getByText('Average apartment')).toBeVisible();
   await expect(page.getByTestId('breakdown').getByText('Size and neighborhood')).toBeVisible();
+  // No total row: neither the raw sum nor a price total is printed.
+  await expect(page.getByTestId('breakdown').getByText('Sum of the rows')).toHaveCount(0);
+  await expect(page.getByTestId('breakdown').getByText('Total, in billions')).toHaveCount(0);
+  await expect(page.getByTestId('breakdown').locator('.brow--total')).toHaveCount(0);
+  await expect(page.getByText('These rows add up to a value too small to be a price, so no estimate is shown.')).toBeVisible();
 
   // Back to a normal apartment: the number returns.
   await hoodInput(page).fill('Saadat Abad');

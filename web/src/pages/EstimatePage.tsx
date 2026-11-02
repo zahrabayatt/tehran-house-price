@@ -140,7 +140,7 @@ function Estimator({ data }: { data: SiteData }) {
 
   let hoodNote = '';
   if (est.usedFallback) hoodNote = hoodId === null && hoodText.trim() === '' ? BLANK_NOTE : FALLBACK_NOTE;
-  const hoodShown = est.usedFallback ? 'Tehran median' : (labelOf(hoodId ?? '') ?? 'Tehran median');
+  const hoodShown = est.usedFallback ? 'Tehran median' : (labelOf(hoodId ?? '') ?? slugTitle(hoodId ?? ''));
 
   const max = Math.max(...est.contributions.map((c) => Math.abs(c.value)), 0.01);
   const gap = gapSentence(model.held_out_gap);
@@ -326,11 +326,13 @@ function Estimator({ data }: { data: SiteData }) {
                 <span className="mono brow__v">{signed(c.value)}</span>
               </div>
             ))}
-            <div className="brow brow--total">
-              <span>{est.tooSmall ? 'Sum of the rows' : 'Total, in billions'}</span>
-              <span />
-              <span className="mono brow__v">{est.total.toFixed(2)}</span>
-            </div>
+            {est.tooSmall ? null : (
+              <div className="brow brow--total">
+                <span>Total, in billions</span>
+                <span />
+                <span className="mono brow__v">{est.total.toFixed(2)}</span>
+              </div>
+            )}
           </div>
           {est.tooSmall ? (
             <p className="small">
