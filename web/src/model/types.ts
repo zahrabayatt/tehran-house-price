@@ -16,6 +16,17 @@ export interface Model {
   cost?: { train: number; selection: number; held_out: number };
   cost_history?: number[];
   cost_history_iterations?: number[];
+  /** How far off the model was on listings it never trained on. */
+  held_out_gap?: {
+    median_billions: number;
+    median_share_of_price: number;
+    p90_billions: number;
+    p90_share_of_price: number;
+  };
+  /** Months covered by the data, as "YYYY-MM". */
+  date_range?: { start: string; end: string };
+  /** Rows used in each time split. */
+  rows?: { train: number; selection: number; held_out: number };
 }
 
 /** One apartment, after validation. Flags are 0 or 1. */
