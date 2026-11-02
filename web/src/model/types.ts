@@ -27,6 +27,26 @@ export interface Model {
   date_range?: { start: string; end: string };
   /** Rows used in each time split. */
   rows?: { train: number; selection: number; held_out: number };
+  /** Held-out cost of scikit-learn on the same features and data, for comparison. */
+  sklearn_cost?: { linear_regression: number; ridge?: number };
+  /** When, how long and where the real training run happened. */
+  trained_at?: string;
+  runtime_ms?: number;
+  environment?: { python: string; numpy: string; os: string };
+  /** Every feature set and lambda tried, with costs on training rows and on the selection month. */
+  candidates?: Candidate[];
+  /** A Python loop against NumPy on the same dot product, measured by training/experiments.py. */
+  vectorization?: { elements: number; loop_ms: number; numpy_ms: number };
+}
+
+export interface Candidate {
+  features: string[];
+  lambda: number;
+  diverged: boolean;
+  converged: boolean;
+  train_cost: number | null;
+  selection_cost: number | null;
+  chosen: boolean;
 }
 
 /** One apartment, after validation. Flags are 0 or 1. */
