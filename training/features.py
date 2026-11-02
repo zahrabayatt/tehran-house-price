@@ -14,6 +14,7 @@ import pandas as pd
 BASE_FEATURES = ("area", "rooms", "age", "parking", "elevator", "storage")
 
 
+# lab:zscore
 def zscore_fit(X) -> tuple[np.ndarray, np.ndarray]:
     """Per-column mean and standard deviation. A constant column gets sigma = 1."""
     X = np.asarray(X, dtype=float)
@@ -31,8 +32,10 @@ def zscore_apply(X, mu, sigma) -> np.ndarray:
     sigma = np.asarray(sigma, dtype=float)
     sigma = np.where(sigma > 0, sigma, 1.0)
     return (X - mu) / sigma
+# endlab
 
 
+# lab:location_lookup
 def location_lookup(train: pd.DataFrame, min_rows: int = 30
                     ) -> tuple[dict[str, float], float]:
     """Median price_per_m2 per neighborhood, and the Tehran fallback median.
@@ -49,14 +52,17 @@ def location_lookup(train: pd.DataFrame, min_rows: int = 30
     lookup = {str(k): float(medians[k]) for k in medians.index
               if counts[k] >= min_rows}
     return lookup, fallback
+# endlab
 
 
+# lab:location_feature
 def location_feature(df: pd.DataFrame, lookup: dict[str, float],
                      fallback: float) -> np.ndarray:
     """area * median_price_per_m2 / 1000, in billions of toman."""
     ppm2 = np.array([lookup.get(n, fallback) if isinstance(n, str) else fallback
                      for n in df["neighborhood"]], dtype=float)
     return df["area"].to_numpy(dtype=float) * ppm2 / 1000.0
+# endlab
 
 
 def _column(df: pd.DataFrame, base: str, lookup, fallback) -> np.ndarray:
@@ -92,6 +98,7 @@ def build_matrix(df: pd.DataFrame, lookup: dict[str, float], fallback: float,
     return np.column_stack(cols)
 
 
+# lab:split_by_month
 def split_by_month(df: pd.DataFrame
                    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """(train, selection, held_out) by month.
@@ -108,3 +115,4 @@ def split_by_month(df: pd.DataFrame
     sel = df[m == sel_month]
     train = df[m < sel_month]
     return train, sel, held
+# endlab

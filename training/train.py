@@ -25,6 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from training.experiments import time_dot
 from training.features import (build_matrix, location_lookup, split_by_month,
                                zscore_apply, zscore_fit)
 from training.model import compute_cost, gradient_descent
@@ -182,10 +183,12 @@ def select_candidate(train: pd.DataFrame, selection: pd.DataFrame, candidates,
     return records, best, best_fit, best_cost
 
 
+# lab:evaluate_held_out
 def evaluate_held_out(fit: dict, held: pd.DataFrame) -> tuple[float, dict, np.ndarray]:
     """The single look at held-out rows, after all choices are fixed."""
     pred = predict_fit(fit, held)
     return plain_cost(fit, held), plain_gap(held["price"].to_numpy(dtype=float), pred), pred
+# endlab
 
 
 def plain_gap(y, pred) -> dict:
@@ -564,6 +567,7 @@ def main() -> None:
 
     result = train_model(df)
     model, train, held = result["model"], result["train"], result["held_out"]
+    model["vectorization"] = time_dot()
 
     sizes = {
         "model/model.json": write_json(MODEL_PATH, model),
