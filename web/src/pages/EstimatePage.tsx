@@ -359,7 +359,7 @@ function Estimator({ data }: { data: SiteData }) {
               Show other listings
             </button>
           </div>
-          <div className="table-wrap">
+          <div className="table-wrap" role="region" aria-label="Real listings and the model estimate" tabIndex={0}>
             <table>
               <thead>
                 <tr>

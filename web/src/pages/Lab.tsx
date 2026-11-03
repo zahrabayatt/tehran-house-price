@@ -388,7 +388,7 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
                 <div className="lab-explain" data-testid="math-tab">
                   <div>
                     <h3>Notation</h3>
-                    <div className="lab-scroll">
+                    <div className="lab-scroll" role="region" aria-label="Notation table" tabIndex={0}>
                       <table className="lab-table">
                         <thead>
                           <tr>
@@ -416,7 +416,7 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
                     <div className="lab-eqs">
                       {stage.math.map((e) => (
                         <div key={e.tex} className="lab-eq">
-                          <div className="lab-eq__tex">
+                          <div className="lab-eq__tex" role="region" aria-label="Equation" tabIndex={0}>
                             <Tex tex={e.tex} display />
                           </div>
                           <p>{e.why}</p>
@@ -427,7 +427,7 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
                   <div>
                     <h3>Worked example, live</h3>
                     <p className="lab-note">These numbers come from the current settings above and change with them.</p>
-                    <pre className="lab-worked mono" data-testid="worked">
+                    <pre className="lab-worked mono" data-testid="worked" role="region" aria-label="Worked example" tabIndex={0}>
                       {stage.worked(ctx, c)}
                     </pre>
                   </div>
@@ -444,7 +444,7 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
               {s.learn === 2 ? (
                 <div data-testid="sk-tab">
                   <h3>The same thing with scikit-learn</h3>
-                  <pre className="lab-sk mono">{stage.sk}</pre>
+                  <pre className="lab-sk mono" role="region" aria-label="scikit-learn code" tabIndex={0}>{stage.sk}</pre>
                   <p className="lab-note lab-note--body">{stage.skNote}</p>
                 </div>
               ) : null}
