@@ -35,7 +35,7 @@ Logistic regression lives in the separate `tehran-air-risk` project and is track
 
 ## Not part of the current scope
 
-Out of scope until studied and added on purpose: Accuracy, Precision, Recall, F1-score, Confusion matrix, Decision threshold analysis, ROC-AUC, and error measures other than the squared-error cost.
+Out of scope until studied and added on purpose: Accuracy, Precision, Recall, F1-score, Confusion matrix, Decision threshold analysis, ROC-AUC, and named error metrics such as MSE, RMSE and MAE. A plain-language typical miss (median gap in billions and as a share of price) is reported only to explain the result.
 
 Revisit this list only when these topics are covered in the course.
 

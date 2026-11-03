@@ -2,8 +2,10 @@
 must not appear in the site source, the training code, the exported data, or the docs.
 
 The project covers Course 1 of the Machine Learning Specialization. Squared-error
-cost is the only measure of fit; classification metrics and error measures other
-than the cost are not implemented, so their names must not appear.
+cost is the only measure of fit; classification metrics and named error metrics such
+as MSE, RMSE and MAE are not implemented, so their names must not appear. A
+plain-language typical miss (median gap in billions and as a share of price) is
+reported only to explain the result.
 
 Allowed, on purpose:
 - ``toPrecision`` (a JavaScript number formatter) in the site source.

@@ -122,7 +122,7 @@ The bias is not penalized. `lambda` is chosen on the selection month from 0, 10,
 
 ## Held-out result and the simple baseline
 
-The final project step compares the model with three simple rules on months it never used. The typical (median) listing is off by about 1.10 billion toman, or 15.6% of its price. Multiplying the area by the neighborhood median price per m2, with no training, did slightly better on a typical listing (0.96 billion, 14.2%), while the trained model has the lower overall cost (18.28 against 28.13). Both statements are true, and the site says both.
+The final project step compares the model with three simple rules on months it never used. The typical (median) listing is off by about 1.10 billion toman, or 15.6% of its price. Multiplying the area by the neighborhood median price per m2, with no training, did slightly better on a typical listing (0.96 billion, 14.2%), while the trained model has the lower overall cost (18.28 against 28.13). Both statements are true. The comparison numbers are in `docs/DATA_CARD.md`; the site states the finding in words.
 
 This comparison was made after the held-out look, so it cannot be used to pick a different model from the same months without losing the claim that the held-out data was untouched.
 

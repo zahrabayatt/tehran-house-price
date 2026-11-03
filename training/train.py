@@ -91,6 +91,8 @@ DIRTY_PER_SIDE = 12
 HEX_R = 7
 _DX, _DY = HEX_R * 1.732, HEX_R * 1.5
 _ROWS, _COLS = 26, 28
+# Provenance: the Nominatim boundary of Tehran city (OpenStreetMap, ODbL), simplified and
+# in the map's own coordinates (the same outline as web/src/components/PriceMap.tsx).
 TEHRAN_POLYGON = [
     [264, 305], [282, 311], [293, 323], [342, 344], [341, 351], [344, 357], [385, 380],
     [397, 393], [404, 395], [432, 391], [436, 393], [441, 406], [443, 419], [459, 412],

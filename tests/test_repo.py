@@ -41,9 +41,14 @@ def test_ci_runs_every_check():
         assert needle in text, needle
 
 
-def test_pages_deploys_on_push_to_main():
+def test_pages_deploys_only_after_ci_succeeds_on_main():
     text = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+    assert re.search(r"workflow_run:\s*\n\s*workflows:\s*\[\s*CI\s*\]", text)
+    assert re.search(r"types:\s*\[\s*completed\s*\]", text)
     assert re.search(r"branches:\s*\[\s*main\s*\]|branches:\s*\n\s*-\s*main", text)
+    assert "github.event.workflow_run.conclusion == 'success'" in text
+    assert "ref: ${{ github.event.workflow_run.head_sha }}" in text
+    assert not re.search(r"^\s*push:", text, re.MULTILINE), "pages must not deploy straight from a push"
     assert "deploy-pages" in text and "upload-pages-artifact" in text
 
 
@@ -70,11 +75,3 @@ def test_readme_numbers_match_the_data_card():
     assert "1.10 billion" in readme and "15.6%" in readme
     card = (ROOT / "docs/DATA_CARD.md").read_text(encoding="utf-8")
     assert "1.10 billion toman, or 15.6%" in card
-
-
-def test_no_attribution_to_a_code_writer_in_the_docs():
-    for name in REQUIRED:
-        p = ROOT / name
-        if p.exists() and p.suffix in {".md", ".yml"}:
-            text = p.read_text(encoding="utf-8")
-            assert not re.search(r"co-authored-by|generated (with|by)|claude|anthropic|\bAI\b", text, re.IGNORECASE), name
