@@ -95,7 +95,7 @@ Counts by range of price per m2 (million toman):
 | 1,000 to 10,000 | 56 |
 | above 10,000 | 129 |
 
-- **Low, 12.** Below 12 are 1,260 rows (1.5%); 894 of them are under 1 million toman per m2 (prices such as 1, 111, 1,111, or a few hundred million entered for a whole flat). The count per million toman falls to its minimum in the 10 to 12 band (about 24 rows per million) and climbs to about 83 in 12 to 15, where real cheap apartments begin. The 1st percentile of the raw column is 0.26 million toman per m2, the 5th is 29.
+- **Low, 12.** Below 12 are 1,260 rows (1.5%); 894 of them are under 1 million toman per m2 (prices such as 1, 111, 1,111, or a few hundred million entered for a whole flat). The count per million toman falls to its minimum in the 10 to 12 band (about 24 rows per million) and climbs to about 83 in 12 to 15, where real cheap apartments begin. Bounds are inclusive, so the 5 rows with a price per m2 of exactly 12 are kept; that is why the range table shows 1,265 rows "up to 12" while 1,260 are removed. The 1st percentile of the raw column is 0.26 million toman per m2, the 5th is 29.
 - **High, 600.** The 99.9th percentile of the kept rows is 500 million toman per m2, and the median of the most expensive neighborhood (Velenjak) is about 250. 600 is 2.4 times that median and 7 times the Tehran median. Rows between 400 and 600 million toman per m2 are 251; sampling them shows them in Elahiyeh, Velenjak, Zafaraniyeh, Niavaran, Saadat Abad, so they are kept. Beyond 600 the density keeps falling (26 in 600 to 700, 50 in 700 to 1,000), the rows drift to non-luxury neighborhoods and placeholder prices (111,111,111,111), and 129 rows exceed 10,000 million toman per m2 (price entered with extra zeros, up to 9e13).
 - Removed: **1,521** (1,260 below 12, 261 above 600).
 
@@ -122,7 +122,7 @@ No row is removed for being expensive in absolute terms. The highest kept `price
 ## Known limits
 
 - Asking prices, not sale prices; ads may be negotiable, stale or duplicated across ad types.
-- One year of data with a dense stretch of eight months; no seasonality or long-run trend can be learned. Median price per m2 is nearly flat across the window (81.9 to 87.0 million toman).
+- The raw subset spans 2022-10 to 2025-02, but only eight months are dense (2024-05 to 2024-12), so no seasonality or long-run trend can be learned. Median price per m2 is nearly flat across the window: 81.9 to 87.0 million toman in the raw rows, and 82.4 to 88.0 after cleaning.
 - `age` is capped at 34 by the "before 1370" bucket, so it hides older buildings.
 - The market ends in December 2024, the last month in the window.
 - Coordinates are present for 51% of rows in 2024-05 and 84% by 2024-12, so location features built from them cover later months better.
@@ -138,6 +138,7 @@ Reproduce with `python -m training.train`. The block further down is written by 
 - 100 candidates: 20 feature sets by 5 lambda values (0, 10, 100, 1000, 10000). Each was trained with this project's `gradient_descent`, at alpha 0.3 for 5,000 updates, with scaling and the neighborhood lookup from training rows only. All settled and none diverged.
 - The candidate with the lowest selection cost, without the penalty term, won. Held-out rows and scikit-learn were not used for any choice. The candidate list was written before any held-out number existed and was not changed after.
 - The script ran twice. The second run only added a cost column for the simple rules in the table below. Candidates and code paths for the model were the same, and every number in `model.json` matched except the timestamp and the runtime.
+- 285 of the 22,513 held-out rows (1.3%) exactly match a training row. Duplicate removal includes the month by design, so a repeat of the same ad in a later month is kept and can land in the held-out months.
 - The final model is the winner trained on the training months only. It was not refit with the selection month, because the lookup and the reported selection cost would then no longer describe it.
 
 ### Is it any good?

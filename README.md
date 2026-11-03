@@ -15,7 +15,7 @@ The site has three pages:
 The prices are **asking prices from ads, not sale prices**, from May to December 2024. The model was trained on May to September, its settings were chosen on October, and it was checked once on November and December.
 
 - On a typical listing it is off by about **1.10 billion toman, or 15.6%** of the asking price. One listing in ten is off by more than 58.5%.
-- A much simpler rule, area times the median price per m2 of the neighborhood, with no training at all, did slightly better on a typical listing (0.96 billion, or 14.2%). The trained model has the lower overall cost (18.28 against 28.13), because its cost counts big misses on expensive flats heavily. Both facts are on the site.
+- A much simpler rule, area times the median price per m2 of the neighborhood, with no training at all, did slightly better on a typical listing (0.96 billion, or 14.2%). The trained model has the lower overall cost (18.28 against 28.13), because its cost counts big misses on expensive flats heavily. The full comparison table is in [`docs/DATA_CARD.md`](docs/DATA_CARD.md); the site states the finding in words.
 - It tends to overestimate cheap flats and underestimate expensive ones, and for a few small, old flats it predicts a price at or below zero. The site shows "too small for this model" instead of a number in that case.
 
 The full reading, with every candidate tried, is in [`docs/DATA_CARD.md`](docs/DATA_CARD.md).
@@ -69,7 +69,7 @@ Details: [`docs/DATA_CARD.md`](docs/DATA_CARD.md) and [`docs/DATA_PROFILE.md`](d
 
 This project follows **Course 1 of the Machine Learning Specialization** (Supervised Machine Learning: Regression and Classification), the linear regression part: prediction function, parameters, cost, gradient descent, learning rate, multiple features, vectorization, feature scaling, feature engineering, polynomial terms, overfitting and regularization. The logistic regression half is a separate project, `tehran-air-risk`.
 
-Out of scope, because they are not part of what this project covers: Accuracy, Precision, Recall, F1-score, Confusion matrix, ROC-AUC, decision threshold analysis, and error measures other than the squared-error cost. A test (`tests/test_scope.py`) fails if these names appear in the site, the training code, the exported data or the docs.
+Out of scope, because they are not part of what this project covers: Accuracy, Precision, Recall, F1-score, Confusion matrix, ROC-AUC, decision threshold analysis, and named error metrics such as MSE, RMSE and MAE. A plain-language typical miss (median gap in billions and as a share of price) is reported only to explain the result. A test (`tests/test_scope.py`) fails if these names appear in the site, the training code, the exported data or the docs.
 
 [`docs/LEARNING_PROGRESS_TRACKER.md`](docs/LEARNING_PROGRESS_TRACKER.md) records which concepts are implemented and where.
 

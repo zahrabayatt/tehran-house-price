@@ -50,7 +50,7 @@ All figures are measured from `data/raw/tehran_apartment_sell.parquet` by `train
 | 2025-01 | 234 |
 | 2025-02 | 21 |
 
-## Training window 2024-04 to 2025-03
+## Initial profiling window (superseded; see DATA_CARD)
 
 - Rows with `created_at_month` in 2024-04 through 2025-03, before any cleaning: **84,380**.
 - Threshold of 5,000 rows: **met**.

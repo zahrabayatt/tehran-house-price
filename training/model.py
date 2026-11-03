@@ -20,7 +20,7 @@ def predict(X, w, b) -> np.ndarray:
 
 
 def compute_cost(X, y, w, b, lambda_: float = 0.0) -> float:
-    """Squared-error cost, with an optional L2 penalty on w (not on b)."""
+    """Squared-error cost, with an optional squared penalty on w (not on b)."""
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
     w = np.asarray(w, dtype=float)
