@@ -40,6 +40,15 @@ const runStatus = (page: Page) => page.getByTestId('run-status');
 const tryNote = (page: Page) => page.getByTestId('try-note');
 const stat = (page: Page, key: string) => stats(page).locator(`div:has(> dt:text-is("${key}")) > dd`);
 
+/** The text of the whole page except the step list and the pager, whose titles name every step. */
+async function pageText(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const body = document.body.cloneNode(true) as HTMLElement;
+    body.querySelectorAll('nav[aria-label="Lab steps"], nav[aria-label="Step navigation"], script, style').forEach((n) => n.remove());
+    return body.textContent ?? '';
+  });
+}
+
 async function goStep(page: Page, n: number) {
   await steps(page).getByRole('button', { name: TITLES[n - 1], exact: true }).click();
   await expect(page.getByRole('heading', { level: 2, name: TITLES[n - 1], exact: true })).toBeVisible();
@@ -368,19 +377,23 @@ test('the held-out step uses the shipped model for the real plots and labels the
   await expect(stats(page)).not.toHaveText(before);
 });
 
-test('overfitting and regularization show no held-out cost', async ({ page }) => {
-  for (const n of [11, 12, 13]) {
+test('steps 1 to 13 show no held-out or training-run details anywhere on the page', async ({ page }) => {
+  for (let n = 1; n <= 13; n++) {
     await goStep(page, n);
     for (let v = 0; v < (await viewNames(page)).length; v++) {
       await page.getByRole('group', { name: 'Plot view' }).getByRole('button').nth(v).click();
-      const text = await page.getByTestId('lab-main').innerText();
+      const text = await pageText(page);
       expect(text, `step ${n}`).not.toMatch(/held-out|held out|test cost/i);
     }
+    await expect(page.getByTestId('live-run')).toHaveCount(0);
+    await expect(page.getByTestId('vs-sklearn')).toHaveCount(0);
+    await expect(page.getByTestId('run-it')).toContainText('python -m training.train');
   }
 });
 
-test('the live training card shows measured values from model.json', async ({ page }) => {
+test('the live training card shows measured values from model.json on the last step', async ({ page }) => {
   const model = await (await page.request.get('data/model.json')).json();
+  await goStep(page, 14);
   const card = page.getByTestId('live-run');
   await expect(card).toContainText('Live model training run');
   const text = await card.innerText();
@@ -400,8 +413,8 @@ test('the vectorization step shows the timings stored in model.json', async ({ p
   const model = await (await page.request.get('data/model.json')).json();
   expect(model.vectorization.loop_ms).toBeGreaterThan(model.vectorization.numpy_ms);
   await goStep(page, 7);
-  const numpy = await stat(page, 'NumPy, vectorized').innerText();
-  const loop = await stat(page, 'Python loop').innerText();
+  const numpy = await stat(page, 'NumPy, 1,000,000 numbers').innerText();
+  const loop = await stat(page, 'Python loop, 1,000,000 numbers').innerText();
   expect(numpy).toMatch(/ms$/);
   expect(loop).toMatch(/ms$/);
   expect(Number.parseFloat(loop)).toBeGreaterThan(Number.parseFloat(numpy));
@@ -424,7 +437,7 @@ test('no step uses a word before the step that introduces it', async ({ page }) 
   for (let n = 1; n <= 14; n++) {
     await goStep(page, n);
     const seen: string[] = [];
-    const read = async () => seen.push(await page.getByTestId('lab-main').innerText());
+    const read = async () => seen.push(await pageText(page));
     const views = (await viewNames(page)).length;
     for (let v = 0; v < views; v++) {
       await page.getByRole('group', { name: 'Plot view' }).getByRole('button').nth(v).click();
@@ -473,5 +486,28 @@ test.describe('on a phone', () => {
     expect(list.direction).toBe('row');
     expect(['auto', 'scroll']).toContain(list.overflowX);
     expect(list.scrollW).toBeGreaterThan(list.clientW);
+  });
+});
+
+test.describe('on a narrow tablet', () => {
+  test.use({ viewport: { width: 800, height: 900 } });
+
+  test('the step list is one horizontally scrolling row without part headers', async ({ page }) => {
+    const list = await steps(page).evaluate((el) => ({
+      overflowX: getComputedStyle(el).overflowX,
+      scrollW: el.scrollWidth,
+      clientW: el.clientWidth,
+      direction: getComputedStyle(el).flexDirection,
+      tops: Array.from(el.querySelectorAll('button')).map((b) => Math.round(b.getBoundingClientRect().top)),
+      heads: Array.from(el.querySelectorAll('.lab-steps__head')).map((h) => getComputedStyle(h).display),
+    }));
+    expect(list.direction).toBe('row');
+    expect(['auto', 'scroll']).toContain(list.overflowX);
+    expect(list.scrollW).toBeGreaterThan(list.clientW);
+    expect(new Set(list.tops).size).toBe(1);
+    expect(list.heads.length).toBeGreaterThan(0);
+    expect(list.heads.every((d) => d === 'none')).toBe(true);
+    const w = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
+    expect(w.scroll).toBeLessThanOrEqual(w.inner);
   });
 });

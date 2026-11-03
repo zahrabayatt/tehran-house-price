@@ -42,11 +42,11 @@ export const shapes: ViewFn = (_ctx, c) => {
   };
   const bw = 60 + c.nf * 16;
   const bh = 90 + Math.log10(c.m) * 40;
-  box(50, 50, bw, bh, 'X', `${count(c.m)} × ${c.nf}`);
+  box(50, 50, bw, bh, 'X', `(${count(c.m)}, ${c.nf})`);
   p.texts.push({ x: 70 + bw, y: 50 + bh / 2 + 6, t: '·', anchor: 'middle', size: 30 });
-  box(90 + bw, 110, 46, 40 + c.nf * 8, 'w', `${c.nf} × 1`);
+  box(90 + bw, 110, 46, 40 + c.nf * 8, 'w', `(${c.nf},)`);
   p.texts.push({ x: 180 + bw, y: 50 + bh / 2 + 6, t: '+ b =', anchor: 'middle', size: 18 });
-  box(225 + bw, 50, 56, bh, 'ŷ', `${count(c.m)} × 1`);
+  box(225 + bw, 50, 56, bh, 'ŷ', `(${count(c.m)},)`);
   p.legend = ['One matrix product replaces a loop over every row and feature'];
   return p;
 };

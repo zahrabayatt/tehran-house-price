@@ -103,15 +103,16 @@ def dot_loop(a, b):
 def time_dot(size=1_000_000, repeats=5):
     rng = np.random.default_rng(0)
     a, b = rng.random(size), rng.random(size)
-    tic = time.perf_counter()
-    dot_loop(a, b)
-    loop_ms = (time.perf_counter() - tic) * 1000
-    best = float("inf")
+    best_loop = float("inf")
+    best_numpy = float("inf")
     for _ in range(repeats):
         tic = time.perf_counter()
+        dot_loop(a, b)
+        best_loop = min(best_loop, time.perf_counter() - tic)
+        tic = time.perf_counter()
         np.dot(a, b)
-        best = min(best, time.perf_counter() - tic)
-    return {"elements": size, "loop_ms": loop_ms, "numpy_ms": best * 1000}
+        best_numpy = min(best_numpy, time.perf_counter() - tic)
+    return {"elements": size, "loop_ms": best_loop * 1000, "numpy_ms": best_numpy * 1000}
 # endlab
 
 

@@ -466,6 +466,8 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
           </nav>
 
           <section className="lab-info">
+            {s.stage === STAGES.length - 1 ? (
+              <>
             <div className="lab-info__card" data-testid="live-run">
               <h3>Live model training run</h3>
               <p>
@@ -488,6 +490,8 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
                 , on the same held-out listings.
               </p>
             </div>
+              </>
+            ) : null}
             <div className="lab-info__card" data-testid="run-it">
               <h3>Run it yourself</h3>
               <pre className="mono">python -m training.train</pre>

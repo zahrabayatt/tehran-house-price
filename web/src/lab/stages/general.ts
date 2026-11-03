@@ -73,7 +73,7 @@ export const GENERALIZING: Stage[] = [
     },
     notation: [
       { s: tex`\lambda`, m: 'Regularization strength', c: 'lambda_' },
-      { s: tex`\sum_j w_j^2`, m: 'Sum of squared weights, not including b', c: 'np.sum(w ** 2)' },
+      { s: tex`\sum_j w_j^2`, m: 'Sum of squared weights, not including b', c: 'penalty += w[j] ** 2' },
     ],
     math: [
       {
@@ -86,7 +86,7 @@ export const GENERALIZING: Stage[] = [
       },
       {
         tex: tex`w_j := w_j \left( 1 - \frac{\alpha\lambda}{m} \right) - \alpha\,\frac{1}{m} \sum_{i} \left( f\!\left(x^{(i)}\right) - y^{(i)} \right) x_j^{(i)}`,
-        why: 'The same update rearranged. The factor just below 1 is what shrinks the weight on every step.',
+        why: 'The same update rearranged. The factor below 1 is what shrinks the weight on every step.',
       },
     ],
     worked: (ctx, c) => {
@@ -156,7 +156,7 @@ export const GENERALIZING: Stage[] = [
         { k: 'Listings plotted', v: count(ctx.listings.length) },
       ];
     },
-    notation: [{ s: tex`J_{\text{held-out}}`, m: 'Cost on rows never used for training', c: 'held_cost' }],
+    notation: [{ s: tex`J_{\text{held-out}}`, m: 'Cost on rows never used for training', c: 'plain_cost(fit, held)' }],
     math: [
       {
         tex: tex`J_{\text{held-out}} = \frac{1}{2m_h} \sum_{i} \left( f\!\left(x^{(i)}\right) - y^{(i)} \right)^2`,

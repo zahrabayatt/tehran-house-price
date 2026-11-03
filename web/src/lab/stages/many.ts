@@ -33,14 +33,14 @@ export const MANY_FEATURES: Stage[] = [
         { k: 'Rows m', v: count(c.m) },
         { k: 'Features n', v: String(c.nf) },
         { k: 'Multiplications', v: count(c.m * c.nf) },
-        { k: 'NumPy, vectorized', v: v ? ms(v.numpy_ms) : 'not measured' },
-        { k: 'Python loop', v: v ? ms(v.loop_ms) : 'not measured' },
+        { k: 'NumPy, 1,000,000 numbers', v: v ? ms(v.numpy_ms) : 'not measured' },
+        { k: 'Python loop, 1,000,000 numbers', v: v ? ms(v.loop_ms) : 'not measured' },
       ];
     },
     notation: [
       { s: tex`\mathbf{w},\ \mathbf{x}`, m: 'Vectors with n elements', c: 'w, x   shape (n,)' },
       { s: tex`\mathbf{X}`, m: 'Matrix with m rows and n columns', c: 'X   shape (m, n)' },
-      { s: tex`\mathbf{w}\cdot\mathbf{x}`, m: 'Dot product', c: 'np.dot(w, x)' },
+      { s: tex`\mathbf{w}\cdot\mathbf{x}`, m: 'Dot product', c: 'np.dot(a, b)' },
     ],
     math: [
       {
@@ -94,7 +94,7 @@ export const MANY_FEATURES: Stage[] = [
     notation: [
       { s: tex`x_j^{(i)}`, m: 'Feature j of example i', c: 'X[i, j]' },
       { s: tex`\mathbf{x}^{(i)}`, m: 'All features of example i', c: 'X[i]' },
-      { s: tex`n`, m: 'Number of features', c: 'X.shape[1]' },
+      { s: tex`n`, m: 'Number of features', c: 'm, n = X.shape' },
       { s: tex`\mathbf{w}`, m: 'One weight per feature', c: 'w   shape (n,)' },
     ],
     math: [
@@ -119,7 +119,7 @@ export const MANY_FEATURES: Stage[] = [
     },
     code: [lab('compute_gradient_loop'), lab('gradient_vec')],
     sk: 'from sklearn.linear_model import SGDRegressor\n\nmodel = SGDRegressor(max_iter=1000).fit(X_train, y_train)\nmodel.coef_       # one weight per feature\nmodel.intercept_  # b',
-    skNote: 'The default SGDRegressor changes its step size during training, so its values differ a little.',
+    skNote: 'On these raw features the default SGDRegressor blows up: on the real sample its coefficients reach about 5e10, far from any sensible price. The features have very different sizes, and scaling them, at step 10, fixes it.',
     tries: [
       {
         label: 'Small α, long run',
@@ -193,7 +193,7 @@ export const MANY_FEATURES: Stage[] = [
     kind: 'multi',
     scaled: true,
     train: true,
-    alpha: { min: -4, max: 0.3, init: -1 },
+    alpha: { min: -4.5, max: 0.3, init: -1 },
     defaults: { alphaExp: -1, iters: '200' },
     views: [
       view('Z-score, step by step', VIEWS.zscorePanels),
@@ -208,14 +208,14 @@ export const MANY_FEATURES: Stage[] = [
       { k: 'Cost J', v: n3(c.j) },
     ],
     notation: [
-      { s: tex`\mu_j`, m: 'Mean of feature j', c: 'mu = np.mean(X, axis=0)' },
-      { s: tex`\sigma_j`, m: 'Standard deviation of feature j', c: 'sigma = np.std(X, axis=0)' },
+      { s: tex`\mu_j`, m: 'Mean of feature j', c: 'mu = X.mean(axis=0)' },
+      { s: tex`\sigma_j`, m: 'Standard deviation of feature j', c: 'sigma = X.std(axis=0)' },
     ],
     math: [
       { tex: tex`\mu_j = \frac{1}{m}\sum_{i=0}^{m-1} x_j^{(i)}`, why: 'The average value of the feature.' },
       {
         tex: tex`\sigma_j^2 = \frac{1}{m}\sum_{i=0}^{m-1} \left( x_j^{(i)} - \mu_j \right)^2`,
-        why: 'The typical spread around that average.',
+        why: 'σ² is the variance, the average squared distance from the mean. Its square root σ is the typical spread around the average.',
       },
       {
         tex: tex`x_j^{(i)} := \frac{x_j^{(i)} - \mu_j}{\sigma_j}`,
@@ -231,8 +231,8 @@ export const MANY_FEATURES: Stage[] = [
       return `Area of the first listing: ${a.toFixed(1)} m²\n(${a.toFixed(1)} − ${ctx.d.mus[0].toFixed(1)}) / ${ctx.d.sds[0].toFixed(1)} = ${fixed((a - ctx.d.mus[0]) / ctx.d.sds[0], 3)}`;
     },
     code: [lab('zscore')],
-    sk: 'from sklearn.preprocessing import StandardScaler\n\nscaler = StandardScaler()\nX_train = scaler.fit_transform(X_train)\nX_test = scaler.transform(X_test)',
-    skNote: 'StandardScaler is this same z-score. Fit it on training rows only, then only transform the rest.',
+    sk: 'from sklearn.preprocessing import StandardScaler\n\nscaler = StandardScaler()\nX_train = scaler.fit_transform(X_train)\nX_new = scaler.transform(X_new)',
+    skNote: 'StandardScaler is this same z-score. Fit it on the training rows only, then scale any new rows with those same fitted values.',
     tries: [
       {
         label: 'Large α with scaling',
@@ -264,8 +264,8 @@ export const MANY_FEATURES: Stage[] = [
       { k: 'Training cost', v: n3(subsetCost(ctx, fitSubset(ctx, c.degree, c.lam))) },
     ],
     notation: [
-      { s: tex`x^2,\ x^3`, m: 'New features made from x', c: 'np.c_[x, x**2, x**3]' },
-      { s: tex`x_{\text{location}}`, m: 'Area × neighborhood price, this project’s feature', c: 'df.area * per_m2' },
+      { s: tex`x^2,\ x^3`, m: 'New features made from x', c: 'poly_features(x, degree)' },
+      { s: tex`x_{\text{location}}`, m: 'Area × neighborhood price, this project’s feature', c: 'location_feature(df, lookup, fallback)' },
     ],
     math: [
       {

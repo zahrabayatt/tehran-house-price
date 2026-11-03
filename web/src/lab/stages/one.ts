@@ -53,7 +53,7 @@ export const ONE_FEATURE: Stage[] = [
   {
     week: 'Project step, before training',
     title: 'Cleaning',
-    text: 'Some ads contain impossible prices, from fractions of a toman to thousands of billions. Move the bounds and see which listings survive.',
+    text: 'Some ads contain impossible prices, from a few thousand toman to thousands of billions. Move the bounds and see which listings survive.',
     ctl: ['lo', 'hi'],
     views: [view('Before and after', VIEWS.cleanDist)],
     stats: (ctx, c) => {
@@ -154,7 +154,7 @@ export const ONE_FEATURE: Stage[] = [
     ],
     stats: costStats,
     notation: [
-      { s: tex`J(w,b)`, m: 'Cost of the current w and b', c: 'total_cost' },
+      { s: tex`J(w,b)`, m: 'Cost of the current w and b', c: 'cost_one(x, y, w, b)' },
       { s: tex`f\!\left(x^{(i)}\right) - y^{(i)}`, m: 'Error on example i', c: 'f_wb - y[i]' },
     ],
     math: [
@@ -214,12 +214,15 @@ export const ONE_FEATURE: Stage[] = [
     ],
     worked: (ctx, c) => {
       const g = slopesAt(ctx, c);
-      const word = (s: number, p: string) => `${s > 0 ? 'positive' : 'negative'}, so ${s > 0 ? 'lowering' : 'raising'} ${p} lowers cost`;
+      const word = (s: number, p: string) =>
+        Math.abs(s) < 1e-3
+          ? 'about zero, already at the lowest point for this parameter'
+          : `${s > 0 ? 'positive' : 'negative'}, so ${s > 0 ? 'lowering' : 'raising'} ${p} lowers cost`;
       return `∂J/∂w = ${n3(g[0])}   ${word(g[0], 'w')}\n∂J/∂b = ${n3(g[1])}   ${word(g[1], 'b')}`;
     },
     code: [lab('gradient_one')],
-    sk: '# scikit-learn calculates gradients inside fit().\n# It does not expose them as a separate step.\nmodel.fit(X_train, y_train)',
-    skNote: 'No separate call exists. This project checks its own gradient against a numeric estimate in a test.',
+    sk: '# LinearRegression solves for w and b directly, so it uses no gradients.\n# Estimators that do use gradients, such as SGDRegressor, come at step 6.\nfrom sklearn.linear_model import LinearRegression\n\nmodel = LinearRegression().fit(X_train, y_train)',
+    skNote: 'LinearRegression finds w and b in one calculation and never computes a gradient. Gradient-based estimators arrive at step 6, and this project checks its own gradient against a numeric estimate in a test.',
     tries: [
       {
         label: 'Left of the minimum',
@@ -274,7 +277,7 @@ export const ONE_FEATURE: Stage[] = [
     },
     code: [lab('descent_one')],
     sk: 'from sklearn.linear_model import SGDRegressor\n\nmodel = SGDRegressor(\n    learning_rate="constant",\n    eta0=alpha,\n    max_iter=num_iters,\n    tol=None,\n).fit(X_train, y_train)',
-    skNote: 'SGDRegressor updates after each example (stochastic), while this project uses all examples per step (batch). Results are close, not identical.',
+    skNote: 'SGDRegressor updates after each single example (stochastic), while this project uses all examples per step (batch). Because it updates so often, it needs a smaller learning rate than the one here, and at the default settings it can end far from the best line. Also, max_iter counts passes over the whole data, not individual updates.',
     tries: [
       {
         label: 'A good learning rate',

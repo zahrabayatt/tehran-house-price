@@ -108,7 +108,7 @@ export const costByLambda: ViewFn = (ctx) => {
   ];
   const chosen = rows.findIndex((r) => r.chosen);
   if (chosen >= 0) p.points = [pt(f, chosen, rows[chosen].selection_cost as number, { r: 7, fill: AC, op: 1 })];
-  p.xLabel = 'λ (spaced evenly, each step ten times the one before)';
+  p.xLabel = 'λ candidates 0, 10, 100, 1000, 10000 (spaced evenly on the axis)';
   p.yLabel = 'Cost J (live model)';
   const sel = rows.map((r) => r.selection_cost as number);
   const spread = Math.max(...sel) - Math.min(...sel);
