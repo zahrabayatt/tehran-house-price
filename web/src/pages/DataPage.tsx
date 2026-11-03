@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import funnel from '../../public/data/funnel.json';
+import listings from '../../public/data/listings.json';
 import profile from '../../public/data/profile.json';
 import { monthLabel } from '../model/siteData';
 import './data.css';
@@ -18,6 +19,8 @@ export function missingShare(share: number): string {
 }
 
 const nullShare = (column: string) => profile.null_shares.find((n) => n.column === column)?.share ?? 0;
+
+const sampleRecords = listings.slice(0, 8);
 
 export function DataPage() {
   useEffect(() => {
@@ -114,9 +117,48 @@ export function DataPage() {
           </table>
         </div>
         <p className="small">
-          Missing is the share of the {count(stored)} stored ads that lack the value, so 0.001% is a single ad. Ad
+          Missing is the share of the {count(stored)} stored ads that lack the value, so {missingShare(1 / stored)} is a single ad. Ad
           titles, descriptions and user fields are never loaded. Coordinates were used only to build the map&apos;s
           hexagon medians and are not on the site.
+        </p>
+      </section>
+
+      <section className="data-section" aria-labelledby="sample-h">
+        <h2 id="sample-h">Sample records</h2>
+        <div className="data-scroll" role="region" aria-label="Sample records table" tabIndex={0}>
+          <table className="data-table" aria-label="Sample records">
+            <thead>
+              <tr>
+                <th scope="col">Neighborhood</th>
+                <th scope="col" className="num">
+                  Area (m²)
+                </th>
+                <th scope="col" className="num">
+                  Rooms
+                </th>
+                <th scope="col" className="num">
+                  Age (years)
+                </th>
+                <th scope="col" className="num">
+                  Asked price (billion toman)
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sampleRecords.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.neighborhood}</td>
+                  <td className="num mono">{r.area}</td>
+                  <td className="num mono">{r.rooms}</td>
+                  <td className="num mono">{r.age}</td>
+                  <td className="num mono">{r.asked.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="small">
+          Eight of the listings from the estimate page. Coordinates and ad text are not shown or kept on the site.
         </p>
       </section>
 
@@ -154,7 +196,8 @@ export function DataPage() {
         <div>
           <h3>Time</h3>
           <p>
-            Training covers ads created from May to December 2024. Each month holds {count(Math.min(...monthRows))} to{' '}
+            The data covers ads created from May to December 2024 (training May to September, October for choices,
+            November to December held out). Each month holds {count(Math.min(...monthRows))} to{' '}
             {count(Math.max(...monthRows))} ads, and the median price per m² stays between {Math.min(...perM2).toFixed(1)}{' '}
             and {Math.max(...perM2).toFixed(1)} million toman. Months after December 2024 are not represented.
           </p>

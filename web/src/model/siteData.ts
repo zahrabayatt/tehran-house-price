@@ -85,9 +85,14 @@ export function signed(value: number, decimals = 2): string {
   return `${value < 0 ? MINUS : '+'}${body}`;
 }
 
-/** A model value for the listings table. Raw model output can be below 0, which is not a price. */
+/**
+ * A model value for the listings table. Raw model output can be below 0, which is not a price,
+ * and values from 0 up to 0.5 are below the cheapest apartment the model learned from.
+ */
 export function modelCell(value: number): string {
-  return value < 0 ? 'Below 0' : value.toFixed(2);
+  if (value < 0) return 'Below 0';
+  if (value < 0.5) return 'Below 0.5';
+  return value.toFixed(2);
 }
 
 /** The plain-words sentence about the typical miss on listings the model never trained on. */

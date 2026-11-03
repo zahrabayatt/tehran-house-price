@@ -29,12 +29,13 @@ export const MANY_FEATURES: Stage[] = [
     views: [view('Dot product', VIEWS.dotProduct), view('Shapes', VIEWS.shapes)],
     stats: (ctx, c) => {
       const v = ctx.model.vectorization;
+      const size = count(v ? v.elements : 1_000_000);
       return [
         { k: 'Rows m', v: count(c.m) },
         { k: 'Features n', v: String(c.nf) },
         { k: 'Multiplications', v: count(c.m * c.nf) },
-        { k: 'NumPy, 1,000,000 numbers', v: v ? ms(v.numpy_ms) : 'not measured' },
-        { k: 'Python loop, 1,000,000 numbers', v: v ? ms(v.loop_ms) : 'not measured' },
+        { k: `NumPy, ${size} numbers`, v: v ? ms(v.numpy_ms) : 'not measured' },
+        { k: `Python loop, ${size} numbers`, v: v ? ms(v.loop_ms) : 'not measured' },
       ];
     },
     notation: [
@@ -119,7 +120,7 @@ export const MANY_FEATURES: Stage[] = [
     },
     code: [lab('compute_gradient_loop'), lab('gradient_vec')],
     sk: 'from sklearn.linear_model import SGDRegressor\n\nmodel = SGDRegressor(max_iter=1000).fit(X_train, y_train)\nmodel.coef_       # one weight per feature\nmodel.intercept_  # b',
-    skNote: 'On these raw features the default SGDRegressor blows up: on the real sample its coefficients reach about 5e10, far from any sensible price. The features have very different sizes, and scaling them, at step 10, fixes it.',
+    skNote: 'On these raw features the default SGDRegressor blows up: on the real sample its coefficients reach around 1e11, and the exact size varies with the random seed. That is far from any sensible price. The features have very different sizes, and scaling them, at step 10, fixes it.',
     tries: [
       {
         label: 'Small α, long run',

@@ -56,6 +56,9 @@ describe('formatting', () => {
   it('shows a negative model value as Below 0', () => {
     expect(modelCell(-1.14)).toBe('Below 0');
     expect(modelCell(5.634)).toBe('5.63');
+    expect(modelCell(0.3)).toBe('Below 0.5');
+    expect(modelCell(0)).toBe('Below 0.5');
+    expect(modelCell(0.5)).toBe('0.50');
   });
   it('words the held-out gap from the model file', () => {
     expect(gapSentence(model.held_out_gap)).toBe(

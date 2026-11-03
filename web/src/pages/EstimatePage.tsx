@@ -187,7 +187,7 @@ function Estimator({ data }: { data: SiteData }) {
             <input
               id="area"
               type="range"
-              min={35}
+              min={25}
               max={250}
               step={1}
               value={area}
@@ -257,21 +257,23 @@ function Estimator({ data }: { data: SiteData }) {
           </div>
         </div>
 
-        <section className="result" data-testid="result" aria-live="polite" aria-label="Estimate">
+        <section className="result" data-testid="result" aria-label="Estimate">
           <div>
             <div className="result__kicker">Estimated asking price</div>
-            {est.tooSmall ? (
-              <div className="result__small" data-testid="too-small">
-                Too small for this model to estimate
-              </div>
-            ) : (
-              <>
-                <div className="result__big" data-testid="estimate">
-                  ≈ {est.total.toFixed(1)}
+            <div aria-live="polite" aria-atomic="true">
+              {est.tooSmall ? (
+                <div className="result__small" data-testid="too-small">
+                  Too small for this model to estimate
                 </div>
-                <div className="result__unit">billion toman</div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="result__big" data-testid="estimate">
+                    ≈ {est.total.toFixed(1)}
+                  </div>
+                  <div className="result__unit">billion toman</div>
+                </>
+              )}
+            </div>
           </div>
           <dl className="result__facts">
             {est.tooSmall ? null : (
@@ -365,8 +367,8 @@ function Estimator({ data }: { data: SiteData }) {
                 <tr>
                   <th scope="col">Neighborhood</th>
                   <th scope="col">Area</th>
-                  <th scope="col" className="num">Asked</th>
-                  <th scope="col" className="num">Model</th>
+                  <th scope="col" className="num">Asked (billion)</th>
+                  <th scope="col" className="num">Model (billion)</th>
                   <th scope="col" className="num">Difference (billion)</th>
                 </tr>
               </thead>
@@ -414,7 +416,7 @@ function Estimator({ data }: { data: SiteData }) {
         <p className="about__wide">{gap}</p>
         <p className="about__wide">
           A simple rule, area times the neighborhood median, did slightly better on a typical listing. The model was
-          chosen for its lower overall cost.
+          picked on October listings before this comparison; on the held-out months it has the lower overall cost.
         </p>
       </section>
     </>
