@@ -11,7 +11,7 @@ type Props = {
 export function sourceLink(githubUrl: string, block: Snippet): string | null {
   if (!githubUrl) return null;
   const end = block.startLine + block.lines.length - 1;
-  return `${githubUrl.replace(/\/+$/, '')}/blob/main/${block.file}#L${block.startLine}-L${end}`;
+  return `${githubUrl.replace(/\/+$/, '')}/blob/${__COMMIT__}/${block.file}#L${block.startLine}-L${end}`;
 }
 
 /** The rows of one block: blank lines are squeezed to one, and a line with no explanation gets none. */

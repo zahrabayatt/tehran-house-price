@@ -485,7 +485,13 @@ export function Lab({ inputs }: { inputs: LabInputs }) {
               <p>
                 {m.cost ? `NumPy cost ${m.cost.held_out.toFixed(3)}` : 'NumPy cost unknown'}
                 {m.sklearn_cost
-                  ? `, scikit-learn cost ${m.sklearn_cost.linear_regression.toFixed(3)}${m.sklearn_cost.ridge !== undefined ? ` (Ridge ${m.sklearn_cost.ridge.toFixed(3)})` : ''}`
+                  ? `. scikit-learn: ${
+                      m.sklearn_cost.ridge !== undefined
+                        ? `Ridge, same λ: ${m.sklearn_cost.ridge.toFixed(3)}${
+                            m.cost && Math.abs(m.sklearn_cost.ridge - m.cost.held_out) < 0.0005 ? ' (matches)' : ''
+                          }; `
+                        : ''
+                    }LinearRegression, no penalty: ${m.sklearn_cost.linear_regression.toFixed(3)}`
                   : ''}
                 , on the same held-out listings.
               </p>

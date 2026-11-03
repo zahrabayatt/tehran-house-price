@@ -104,7 +104,12 @@ describe('code links', () => {
   const block = { name: 'x', file: 'training/model.py', startLine: 10, lines: ['a', 'b', 'c'] };
   it('exist only when the repository address is set', () => {
     expect(sourceLink('', block)).toBeNull();
-    expect(sourceLink('https://github.com/me/repo', block)).toBe('https://github.com/me/repo/blob/main/training/model.py#L10-L12');
-    expect(sourceLink('https://github.com/me/repo/', block)).toBe('https://github.com/me/repo/blob/main/training/model.py#L10-L12');
+    const base = `https://github.com/me/repo/blob/${__COMMIT__}/training/model.py#L10-L12`;
+    expect(sourceLink('https://github.com/me/repo', block)).toBe(base);
+    expect(sourceLink('https://github.com/me/repo/', block)).toBe(base);
+  });
+  it('point at a commit, not a branch that moves', () => {
+    expect(__COMMIT__).toMatch(/^[0-9a-f]{40}$/);
+    expect(sourceLink('https://github.com/me/repo', block)).not.toContain('/blob/main/');
   });
 });

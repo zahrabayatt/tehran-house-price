@@ -34,7 +34,7 @@ export function Layout() {
       <footer className="site-footer">
         <div className="site-footer__inner">
           <span>
-            Built by {AUTHOR}. Data: Divar real estate ads, ODbL. City outline: OpenStreetMap, ODbL.
+            Built by {AUTHOR}. Data: Divar real estate ads, ODbL. City outline: © OpenStreetMap contributors, ODbL.
             {GITHUB_URL ? (
               <>
                 {' '}

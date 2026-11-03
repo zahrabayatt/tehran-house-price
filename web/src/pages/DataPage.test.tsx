@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import funnel from '../../public/data/funnel.json';
+import listings from '../../public/data/listings.json';
 import profile from '../../public/data/profile.json';
 import { DataPage } from './DataPage';
 
@@ -37,6 +38,23 @@ describe('DataPage', () => {
     const price = rows.find((r) => r.textContent?.includes('price_value'))!;
     expect(price.textContent).toContain('0%');
     expect(price.textContent).not.toContain('0.001%');
+  });
+
+  it('shows eight sample records with only neighborhood, area, rooms, age and asked price', () => {
+    render(<DataPage />);
+    const table = screen.getByRole('table', { name: 'Sample records' });
+    const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers).toEqual(['Neighborhood', 'Area (m²)', 'Rooms', 'Age (years)', 'Asked price (billion toman)']);
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(8);
+    const first = within(rows[0]).getAllByRole('cell').map((c) => c.textContent);
+    expect(first).toEqual([
+      listings[0].neighborhood,
+      String(listings[0].area),
+      String(listings[0].rooms),
+      String(listings[0].age),
+      listings[0].asked.toFixed(2),
+    ]);
   });
 
   it('shows no bracketed placeholders or empty numbers', () => {

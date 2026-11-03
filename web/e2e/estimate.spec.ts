@@ -191,7 +191,7 @@ test('the project summary is honest and the GitHub link is hidden while unset', 
   const about = page.getByRole('region', { name: 'About this project' });
   await expect(about).toContainText('81,603 Tehran apartment listings');
   await expect(about).toContainText(
-    'A simple rule, area times the neighborhood median, did slightly better on a typical listing. The model was chosen for its lower overall cost.',
+    'A simple rule, area times the neighborhood median, did slightly better on a typical listing. The model was picked on October listings before this comparison; on the held-out months it has the lower overall cost.',
   );
   await expect(about.getByRole('link', { name: 'See how it works' })).toHaveAttribute('href', /#\/lab$/);
   await expect(about.getByRole('link', { name: 'GitHub' })).toHaveCount(0);

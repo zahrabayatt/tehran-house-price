@@ -160,7 +160,7 @@ export function runOne(d: Fit1D, w0: number, b0: number, alpha: number, iters: n
   return { h, diverged, ms: performance.now() - t0 };
 }
 
-/** Descent on many features from w = 0, b = 0, with an optional L2 penalty on w. */
+/** Descent on many features from w = 0, b = 0, with an optional squared penalty on w. */
 function descend(X: number[][], y: number[], alpha: number, iters: number, lambda: number) {
   const m = X.length;
   const n = X[0].length;
@@ -220,7 +220,7 @@ export function polyCost(f: PolyModel, xs: number[], ys: number[]): number {
 /**
  * Polynomial regression by gradient descent. The features are x^1 .. x^degree, each
  * z-scored on its own (they differ wildly in size), and descent starts from zero.
- * lambda is the L2 penalty on the weights, never on the bias. Unlike the mockup,
+ * lambda is the squared penalty on the weights, never on the bias. Unlike the mockup,
  * which solved this exactly, a strong lambda here shrinks the weights the way the
  * course describes, and a too-large alpha diverges visibly.
  */
