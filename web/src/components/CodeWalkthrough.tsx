@@ -35,7 +35,7 @@ export function CodeWalkthrough({ blocks, explanations, githubUrl }: Props) {
         return (
           <div key={block.name} className="code-block">
             <div className="code-block__file">{link ? <a href={link}>{where}</a> : <span>{where}</span>}</div>
-            <div className="code-scroll">
+            <div className="code-scroll" role="region" aria-label={`Code, ${where}`} tabIndex={0}>
               <table className="code-table">
                 <tbody>
                   {codeRows(block, explanations[block.name]).map((r, i) => (
