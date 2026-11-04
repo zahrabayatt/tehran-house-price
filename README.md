@@ -2,7 +2,7 @@
 
 A small website that estimates the asking price of an apartment in Tehran from its area, neighborhood, rooms, age, parking, elevator and storage. It is built to show how a linear regression model works, from the raw ads to the trained weights, and to be honest about how far off it can be.
 
-Live site: https://zahrabayat.github.io/tehran-house-price/
+Live site: https://zahrabayatt.github.io/tehran-house-price/
 
 The site has three pages:
 
@@ -67,7 +67,7 @@ Details: [`docs/DATA_CARD.md`](docs/DATA_CARD.md) and [`docs/DATA_PROFILE.md`](d
 
 ## Course scope
 
-This project follows **Course 1 of the Machine Learning Specialization** (Supervised Machine Learning: Regression and Classification), the linear regression part: prediction function, parameters, cost, gradient descent, learning rate, multiple features, vectorization, feature scaling, feature engineering, polynomial terms, overfitting and regularization. The logistic regression half is a separate project, [Tehran Air Risk](https://zahrabayat.github.io/tehran-air-risk/) ([code](https://github.com/Zahrabayat/tehran-air-risk)).
+This project follows **Course 1 of the Machine Learning Specialization** (Supervised Machine Learning: Regression and Classification), the linear regression part: prediction function, parameters, cost, gradient descent, learning rate, multiple features, vectorization, feature scaling, feature engineering, polynomial terms, overfitting and regularization. The logistic regression half is a separate project, [Tehran Air Risk](https://zahrabayatt.github.io/tehran-air-risk/) ([code](https://github.com/zahrabayatt/tehran-air-risk)).
 
 Out of scope, because they are not part of what this project covers: Accuracy, Precision, Recall, F1-score, Confusion matrix, ROC-AUC, decision threshold analysis, and named error metrics such as MSE, RMSE and MAE. A plain-language typical miss (median gap in billions and as a share of price) is reported only to explain the result. A test (`tests/test_scope.py`) fails if these names appear in the site, the training code, the exported data or the docs.
 
