@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { GITHUB_URL } from '../src/config';
 
 // The page fetches its data from the preview server. Several tests change one file on the way in.
 const DATA = '**/data/';
@@ -187,14 +188,14 @@ test('a negative model value in the data is shown as Below 0', async ({ page }) 
   await expect(page.locator('#check tbody')).not.toContainText('−1.14');
 });
 
-test('the project summary is honest and the GitHub link is hidden while unset', async ({ page }) => {
+test('the project summary is honest and links to the repository', async ({ page }) => {
   const about = page.getByRole('region', { name: 'About this project' });
   await expect(about).toContainText('81,603 Tehran apartment listings');
   await expect(about).toContainText(
     'A simple rule, area times the neighborhood median, did slightly better on a typical listing. The model was picked on October listings before this comparison; on the held-out months it has the lower overall cost.',
   );
   await expect(about.getByRole('link', { name: 'See how it works' })).toHaveAttribute('href', /#\/lab$/);
-  await expect(about.getByRole('link', { name: 'GitHub' })).toHaveCount(0);
+  await expect(about.getByRole('link', { name: 'GitHub' })).toHaveAttribute('href', GITHUB_URL);
 });
 
 test('no metric jargon appears on the page', async ({ page }) => {
