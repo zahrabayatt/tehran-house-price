@@ -1,39 +1,38 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card } from '../components/Card';
-import { PriceMap, type MapCell, type MapMarker } from '../components/PriceMap';
-import { GITHUB_URL } from '../config';
+import { PALETTE } from '../components/mapColours';
 import { predict, validateInput } from '../model/predict';
 import {
-  gapSentence, hexCenter, hexOpacities, listingPage, loadSiteData, modelCell, monthLabel,
-  resolveNeighborhood, signed, slugTitle, type SiteData,
+  choosable, loadEstimateData, monthLabel, priceBands, resolveHood, similarRange, type EstimateData,
 } from '../model/siteData';
+import { usePageTheme } from '../useTheme';
 import './estimate.css';
 
 const BASE = import.meta.env.BASE_URL;
-const DEFAULT_NEIGHBORHOOD = 'saadat-abad';
+// The map library is large, so it loads after the form and the estimate are on screen.
+const NeighborhoodMap = lazy(() => import('../components/NeighborhoodMap'));
+const DEFAULT_HOOD = 'Saadat Abad';
 const DEFAULT_AREA = 85;
-const FALLBACK_NOTE = 'Not enough listings here, using the Tehran median';
-const BLANK_NOTE = 'No neighborhood chosen, using the Tehran median';
+/** Tehran asking prices today against December 2024, rounded (docs/improvements, item 1). */
+export const TODAY_FACTOR_TEXT = 'Tehran asking prices are about 3 times higher today. This estimate is not adjusted.';
 
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; data: SiteData };
+  | { status: 'ready'; data: EstimateData };
 
-function useSiteData() {
+function useEstimateData() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
     setState({ status: 'loading' });
-    loadSiteData(BASE).then(
+    loadEstimateData(BASE).then(
       (data) => live && setState({ status: 'ready', data }),
       (e: unknown) => {
         if (!live) return;
         const text = e instanceof Error ? e.message : String(e);
-        const message = text.startsWith('Could not load') ? text : `Could not load the page data. ${text}`;
-        setState({ status: 'error', message });
+        setState({ status: 'error', message: text.startsWith('Could not load') ? text : `Could not load the page data. ${text}` });
       },
     );
     return () => {
@@ -47,29 +46,19 @@ export function EstimatePage() {
   useEffect(() => {
     document.title = 'Tehran House Price: Estimate';
   }, []);
-  const { state, retry } = useSiteData();
+  const { state, retry } = useEstimateData();
   return (
-    <main className="page">
-      <div>
-        <h1>What would this Tehran apartment be advertised for?</h1>
-        <p className="lede">
-          Describe an apartment and get an estimate from a model trained on real Divar listings, with every step of the
-          calculation shown.
-        </p>
-      </div>
+    <main className="page est-page">
+      <h1>What was this apartment advertised for in late 2024?</h1>
       {state.status === 'loading' ? (
-        <p role="status" className="notice">
-          Loading the model and the map…
-        </p>
+        <p role="status" className="notice">Loading the model and the map…</p>
       ) : null}
       {state.status === 'error' ? (
         <div role="alert" className="notice notice--error">
           <p>
             <strong>The estimator did not load.</strong> {state.message}
           </p>
-          <button type="button" className="btn btn--outline" onClick={retry}>
-            Try again
-          </button>
+          <button type="button" className="btn btn--outline" onClick={retry}>Try again</button>
         </div>
       ) : null}
       {state.status === 'ready' ? <Estimator data={state.data} /> : null}
@@ -77,128 +66,79 @@ export function EstimatePage() {
   );
 }
 
-function Estimator({ data }: { data: SiteData }) {
-  const { model, neighborhoods, hexes, listings } = data;
-  const labelOf = (slug: string) => neighborhoods.find((n) => n.id === slug)?.label;
+function Estimator({ data }: { data: EstimateData }) {
+  const { model, hoods, similar } = data;
+  const theme = usePageTheme();
+  const list = useMemo(() => choosable(hoods), [hoods]);
+  const bands = useMemo(() => priceBands(list), [list]);
+  const start = resolveHood(DEFAULT_HOOD, list);
 
-  const [hoodId, setHoodId] = useState<string | null>(DEFAULT_NEIGHBORHOOD);
-  const [hoodText, setHoodText] = useState(labelOf(DEFAULT_NEIGHBORHOOD) ?? '');
-  const [pickedHex, setPickedHex] = useState<number | null>(null);
+  const [hoodId, setHoodId] = useState<number | null>(start?.id ?? null);
+  const [hoodText, setHoodText] = useState(start?.properties.name ?? '');
   const [area, setArea] = useState(DEFAULT_AREA);
   const [rooms, setRooms] = useState('2');
   const [year, setYear] = useState('1395');
   const [parking, setParking] = useState(true);
   const [elevator, setElevator] = useState(true);
   const [storage, setStorage] = useState(true);
-  const [page, setPage] = useState(0);
 
-  const cells: MapCell[] = useMemo(() => {
-    const ops = hexOpacities(hexes);
-    return hexes.map((h, i) => ({
-      d: h.d,
-      slug: h.neighborhood,
-      label: neighborhoods.find((n) => n.id === h.neighborhood)?.label ?? slugTitle(h.neighborhood),
-      value: h.value,
-      opacity: ops[i],
-    }));
-  }, [hexes, neighborhoods]);
-
-  // Always clean the form values before the model sees them.
+  const hood = list.find((f) => f.id === hoodId) ?? null;
+  // The model knows Divar's neighborhood names; the official neighborhood brings the one most of its ads use.
   const { input, warnings } = validateInput({
-    area, neighborhood: hoodId, rooms, year, parking, elevator, storage,
+    area, neighborhood: hood?.properties.divar ?? null, rooms, year, parking, elevator, storage,
   });
   const est = predict(model, input);
-
+  const range = similarRange(similar, hood, input.area);
   const yearWarning = warnings.some((w) => w.code === 'year');
   const lowData = warnings.some((w) => w.code === 'lowData');
-  const market = monthLabel(model.date_range.end);
-  const perM2 = Math.round((est.total / input.area) * 1000);
+  const month = monthLabel(model.date_range.end);
 
-  const pickFromMap = (i: number) => {
-    const slug = cells[i].slug;
-    setHoodId(slug);
-    setHoodText(cells[i].label);
-    setPickedHex(i);
+  let hoodNote = 'Type to search, or click the map below.';
+  // Kept to one line each, so the form never changes height.
+  if (hood === null) hoodNote = hoodText.trim() === '' ? 'None chosen: using the Tehran median.' : 'No match. Pick from the list or the map.';
+  else if (est.usedFallback) hoodNote = 'Few ads here: using the Tehran median.';
+
+  const pick = (id: number) => {
+    const f = list.find((x) => x.id === id);
+    if (!f) return;
+    setHoodId(id);
+    setHoodText(f.properties.name);
   };
-  const typeNeighborhood = (text: string) => {
+  const type = (text: string) => {
     setHoodText(text);
-    setHoodId(resolveNeighborhood(text, neighborhoods)?.id ?? null);
-    setPickedHex(null);
+    setHoodId(resolveHood(text, list)?.id ?? null);
   };
 
-  // The marker shows only for a neighborhood that has a hexagon, at that hexagon's center.
-  let marker: MapMarker | null = null;
-  if (hoodId !== null) {
-    const at = pickedHex !== null && cells[pickedHex].slug === hoodId
-      ? pickedHex
-      : cells.findIndex((c) => c.slug === hoodId);
-    if (at >= 0) {
-      const c = hexCenter(cells[at].d);
-      marker = { x: c.x, y: c.y, label: labelOf(hoodId) };
-    }
-  }
-
-  let hoodNote = '';
-  if (est.usedFallback) hoodNote = hoodId === null && hoodText.trim() === '' ? BLANK_NOTE : FALLBACK_NOTE;
-  const hoodShown = est.usedFallback ? 'Tehran median' : (labelOf(hoodId ?? '') ?? slugTitle(hoodId ?? ''));
-
-  const max = Math.max(...est.contributions.map((c) => Math.abs(c.value)), 0.01);
-  const gap = gapSentence(model.held_out_gap);
-  const totalRows = model.rows.train + model.rows.selection + model.rows.held_out;
-
-  const goToCheck = () => {
-    const el = document.getElementById('check');
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    el?.focus({ preventScroll: true });
-  };
+  const colours = theme === 'dark' ? PALETTE.dark : PALETTE.light;
+  const legend = [`under ${bands[0]}`, `${bands[0]} to ${bands[1]}`, `${bands[1]} to ${bands[2]}`, `${bands[2]} to ${bands[3]}`, `over ${bands[3]}`];
 
   return (
     <>
-      <section className="estimate-grid">
-        <form className="card form" aria-labelledby="form-title" onSubmit={(e) => e.preventDefault()}>
-          <h2 id="form-title">The apartment</h2>
-          <div className="field">
+      <div className="est-grid">
+        <form className="est-card est-form" aria-label="The apartment" onSubmit={(e) => e.preventDefault()}>
+          <div className="est-field">
             <label htmlFor="hood">Neighborhood</label>
-            <input
-              id="hood"
-              type="text"
-              list="hood-options"
-              autoComplete="off"
-              placeholder="Start typing a neighborhood"
-              value={hoodText}
-              onChange={(e) => typeNeighborhood(e.target.value)}
-              aria-describedby="hood-note"
-              className="control"
-            />
+            <input id="hood" type="text" list="hood-options" autoComplete="off" placeholder="Start typing a neighborhood"
+              value={hoodText} title={hoodText} onChange={(e) => type(e.target.value)} aria-describedby="hood-note"
+              className="est-input" />
             <datalist id="hood-options">
-              {neighborhoods.map((n) => (
-                <option key={n.id} value={n.label} />
-              ))}
+              {list.map((f) => <option key={f.id} value={f.properties.name} />)}
             </datalist>
-            <div id="hood-note" className="help help--warn" role="status">
+            <p id="hood-note" className={hood === null || est.usedFallback ? 'est-hint est-hint--warn' : 'est-hint'} role="status">
               {hoodNote}
-            </div>
+            </p>
           </div>
-          <div className="field field--tight">
-            <div className="row-between">
+          <div className="est-field">
+            <div className="est-row">
               <label htmlFor="area">Area</label>
               <span className="mono">{input.area} m²</span>
             </div>
-            <input
-              id="area"
-              type="range"
-              min={25}
-              max={250}
-              step={1}
-              value={area}
-              onChange={(e) => setArea(Number(e.target.value))}
-              className="slider"
-            />
+            <input id="area" type="range" min={25} max={250} step={1} value={area} onChange={(e) => setArea(Number(e.target.value))} />
           </div>
-          <div className="two-up">
-            <div className="field">
+          <div className="est-two">
+            <div className="est-field">
               <label htmlFor="rooms">Bedrooms</label>
-              <select id="rooms" value={rooms} onChange={(e) => setRooms(e.target.value)} className="control">
+              <select id="rooms" value={rooms} onChange={(e) => setRooms(e.target.value)} className="est-input">
                 <option value="0">Studio</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
@@ -207,217 +147,72 @@ function Estimator({ data }: { data: SiteData }) {
                 <option value="5">5 or more</option>
               </select>
             </div>
-            <div className="field">
+            <div className="est-field">
               <label htmlFor="year">Year built</label>
-              <input
-                id="year"
-                type="number"
-                min={1370}
-                max={1403}
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                aria-describedby="year-help"
-                className="control"
-              />
+              <input id="year" type="number" min={1370} max={1403} value={year} onChange={(e) => setYear(e.target.value)}
+                aria-describedby="year-help" className="est-input mono" />
             </div>
           </div>
-          <div id="year-help" className={yearWarning ? 'help help--warn' : 'help'}>
-            {yearWarning
-              ? `Enter a Solar Hijri year from 1370 to 1403. Using ${input.year} for now.`
-              : 'Solar Hijri year, 1370 to 1403'}
-          </div>
-          <fieldset className="has">
+          <p id="year-help" className={yearWarning ? 'est-hint est-hint--warn' : 'est-hint'}>
+            {yearWarning ? `Enter a Solar Hijri year from 1370 to 1403. Using ${input.year} for now.` : 'Solar Hijri year, 1370 to 1403'}
+          </p>
+          <fieldset className="est-has">
             <legend>Has</legend>
-            <label className="check">
-              <input type="checkbox" checked={parking} onChange={() => setParking(!parking)} />
-              Parking
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={elevator} onChange={() => setElevator(!elevator)} />
-              Elevator
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={storage} onChange={() => setStorage(!storage)} />
-              Storage
-            </label>
+            {([['Parking', parking, setParking], ['Elevator', elevator, setElevator], ['Storage', storage, setStorage]] as const).map(
+              ([name, on, set]) => (
+                <label key={name} className={on ? 'est-chip on' : 'est-chip'}>
+                  <input type="checkbox" checked={on} onChange={() => set(!on)} />
+                  {name}
+                </label>
+              ),
+            )}
           </fieldset>
         </form>
 
-        <div className="card map-card">
-          <PriceMap cells={cells} marker={marker} onPick={pickFromMap} />
-          <div className="legend">
-            <span className="legend__scale">
-              Lower price per m²
-              {[0.2, 0.4, 0.6, 0.85].map((o) => (
-                <span key={o} className="swatch" style={{ opacity: o }} />
-              ))}
-              Higher
-            </span>
-            <span>Click to choose an area, or type it on the left. No individual listing is shown.</span>
-          </div>
-        </div>
-
-        <section className="result" data-testid="result" aria-label="Estimate">
-          <div>
-            <div className="result__kicker">Estimated asking price</div>
-            <div aria-live="polite" aria-atomic="true">
-              {est.tooSmall ? (
-                <div className="result__small" data-testid="too-small">
-                  Too small for this model to estimate
-                </div>
-              ) : (
-                <>
-                  <div className="result__big" data-testid="estimate">
-                    ≈ {est.total.toFixed(1)}
-                  </div>
-                  <div className="result__unit">billion toman</div>
-                </>
-              )}
-            </div>
-          </div>
-          <dl className="result__facts">
-            {est.tooSmall ? null : (
-              <>
-                <dt>Per square meter</dt>
-                <dd className="mono">≈ {perM2} million</dd>
-              </>
+        <section className="est-card est-result" aria-label="Estimate" data-testid="result">
+          <span className="est-tag">{month} price</span>
+          <div aria-live="polite" aria-atomic="true">
+            {est.tooSmall ? (
+              <p className="est-big est-big--small" data-testid="too-small">Too small for this model to estimate</p>
+            ) : (
+              <p className="est-big" data-testid="estimate">
+                {est.total.toFixed(1)}
+                <span>billion toman</span>
+              </p>
             )}
-            <dt>Neighborhood</dt>
-            <dd data-testid="result-hood">{hoodShown}</dd>
-          </dl>
-          <div className="result__foot">
-            <h2>Market as of {market}</h2>
-            <p>
-              Today’s prices may be very different. This is an advertised-price estimate, not a sale price or an
-              appraisal.{' '}
-              <button type="button" className="linklike" onClick={goToCheck}>
-                See how far off it can be
-              </button>
-              .
-            </p>
+          </div>
+          <p className="est-then" data-testid="similar">
+            {range ? (
+              <>Similar ads then: <b>{range.low.toFixed(1)} to {range.high.toFixed(1)} billion</b></>
+            ) : (
+              'Too few similar ads then to show a range.'
+            )}
+          </p>
+          <p className="est-small est-src">{range ? range.source : ''}</p>
+          <p className="est-small est-today">{TODAY_FACTOR_TEXT}</p>
+          {lowData ? <p className="est-small est-warn">Few apartments this large were in the data, so this estimate is less reliable.</p> : null}
+          <div className="est-links">
+            <Link to="/lab">How was this calculated?</Link>
+            <Link to="/data">How close is the model?</Link>
           </div>
         </section>
-      </section>
+      </div>
 
-      {lowData ? (
-        <div role="status" className="notice notice--warn">
-          Few listings this large were available, so treat this estimate with extra caution.
-        </div>
-      ) : null}
-
-      <section className="two-cards">
-        <Card title="How the model reached this number" className="breakdown">
-          <div data-testid="breakdown" className="breakdown__rows">
-            <div className="brow" data-row>
-              <span>Average apartment</span>
-              <div className="bar" />
-              <span className="mono brow__v">{est.baseline.toFixed(2)}</span>
-            </div>
-            {est.contributions.map((c) => (
-              <div className="brow" data-row key={c.label}>
-                <span>{c.label}</span>
-                <div className="bar">
-                  <div
-                    className="bar__fill"
-                    style={{
-                      width: `${(Math.abs(c.value) / max) * 100}%`,
-                      background: c.value < 0 ? 'var(--mut)' : 'var(--ac)',
-                    }}
-                  />
-                </div>
-                <span className="mono brow__v">{signed(c.value)}</span>
-              </div>
+      <section className="est-card est-mapcard" aria-label="Map">
+        <Suspense fallback={<div className="hood-map" />}>
+          <NeighborhoodMap data={hoods} bands={bands} selectedId={hoodId} onSelect={pick} dark={theme === 'dark'} />
+        </Suspense>
+        <div className="est-cap">
+          <b data-testid="map-caption">
+            {hood ? `${hood.properties.name}: ${hood.properties.ppm2} million toman per m² in 2024, from ${hood.properties.ads.toLocaleString('en-US')} ads` : 'Click a neighborhood to choose it.'}
+          </b>
+          <span className="est-legend" aria-label="Legend: million toman per square meter">
+            {legend.map((t, i) => (
+              <span key={t}><i className="sw" style={{ background: colours[i] }} />{t}</span>
             ))}
-            {est.tooSmall ? null : (
-              <div className="brow brow--total">
-                <span>Total, in billions</span>
-                <span />
-                <span className="mono brow__v">{est.total.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-          {est.tooSmall ? (
-            <p className="small">
-              These rows add up to a value too small to be a price, so no estimate is shown.
-            </p>
-          ) : null}
-          <p className="small">
-            These numbers describe patterns in the ads, not causes. For example, an elevator may look negative because of
-            the other features it comes with.
-          </p>
-          <p className="small">
-            In a linear model this list is the whole calculation. <Link to="/lab">Learn how in the Model Lab</Link>.
-          </p>
-        </Card>
-
-        <Card className="check-card">
-          <div id="check" tabIndex={-1} className="stack">
-          <div className="check-head">
-            <div>
-              <h2>How far off can it be?</h2>
-              <p className="small">Real listings the model never trained on, including its misses.</p>
-            </div>
-            <button type="button" className="btn btn--outline" onClick={() => setPage(page + 1)}>
-              Show other listings
-            </button>
-          </div>
-          <div className="table-wrap" role="region" aria-label="Real listings and the model estimate" tabIndex={0}>
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Neighborhood</th>
-                  <th scope="col">Area</th>
-                  <th scope="col" className="num">Asked (billion)</th>
-                  <th scope="col" className="num">Model (billion)</th>
-                  <th scope="col" className="num">Difference (billion)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listingPage(listings, page).map((l, i) => (
-                  <tr key={`${page}-${i}`}>
-                    <td>{l.neighborhood}</td>
-                    <td>{l.area} m²</td>
-                    <td className="num mono">{l.asked.toFixed(2)}</td>
-                    <td className="num mono">{modelCell(l.model)}</td>
-                    <td className="num mono">{signed(l.difference)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="small">{gap}</p>
-          </div>
-        </Card>
-      </section>
-
-      <section aria-label="About this project" className="about">
-        <div>
-          <div className="about__k">The project</div>
-          <div className="about__v">Linear regression, written from scratch</div>
+            <span className="u">million per m²</span>
+          </span>
         </div>
-        <div>
-          <div className="about__k">Data</div>
-          <div className="about__v">{totalRows.toLocaleString('en-US')} Tehran apartment listings from Divar</div>
-        </div>
-        <div>
-          <div className="about__k">Not in the model</div>
-          <div className="about__v">Condition, view, floor plan</div>
-        </div>
-        <div className="about__links">
-          <Link to="/lab" className="btn btn--solid">
-            See how it works
-          </Link>
-          {GITHUB_URL ? (
-            <a href={GITHUB_URL} className="about__github">
-              GitHub
-            </a>
-          ) : null}
-        </div>
-        <p className="about__wide">{gap}</p>
-        <p className="about__wide">
-          A simple rule, area times the neighborhood median, did slightly better on a typical listing. The model was
-          picked on October listings before this comparison; on the held-out months it has the lower overall cost.
-        </p>
       </section>
     </>
   );

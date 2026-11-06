@@ -1,19 +1,28 @@
 import { loadModel } from './loadModel';
 import type { Model } from './types';
 
-export interface Neighborhood {
-  id: string;
-  label: string;
-  /** Median asking price per m2, in million toman. */
-  median: number;
+/** One official neighborhood (OpenStreetMap), with its 2024 ads (training/site_data.py). */
+export interface HoodFeature {
+  type: 'Feature';
+  id: number;
+  properties: {
+    name: string;
+    /** Ads inside the neighborhood, May to December 2024. */
+    ads: number;
+    /** Median asking price per m², million toman. Only with at least 15 ads. */
+    ppm2?: number;
+    /** The Divar neighborhood most of its ads name: what the model is given. */
+    divar?: string;
+  };
+  geometry: { type: 'MultiPolygon'; coordinates: number[][][][] };
+}
+export interface HoodCollection {
+  type: 'FeatureCollection';
+  features: HoodFeature[];
 }
 
-/** One map cell: an SVG path, its median price per m2 (million toman) and the neighborhood slug. */
-export interface Hex {
-  d: string;
-  value: number;
-  neighborhood: string;
-}
+/** Area (m²) and price (billion toman) of November and December ads, by neighborhood id. */
+export type SimilarAds = Record<string, Array<[number, number]>>;
 
 export interface Listing {
   neighborhood: string;
@@ -28,14 +37,13 @@ export interface Listing {
   difference: number;
 }
 
-/** The model file with the fields this page needs. */
+/** The model file with the fields the pages need. */
 export type SiteModel = Model & Required<Pick<Model, 'held_out_gap' | 'date_range' | 'rows'>>;
 
-export interface SiteData {
+export interface EstimateData {
   model: SiteModel;
-  neighborhoods: Neighborhood[];
-  hexes: Hex[];
-  listings: Listing[];
+  hoods: HoodCollection;
+  similar: SimilarAds;
 }
 
 const MONTHS = [
@@ -50,30 +58,71 @@ export function monthLabel(ym: string): string {
   return `${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
 }
 
-/** Centre of a hexagon path such as "M450.0 258.0 L443.9 261.5 ... Z": the mean of its corners. */
-export function hexCenter(d: string): { x: number; y: number } {
-  const nums = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
-  const n = Math.floor(nums.length / 2);
-  if (n === 0) throw new Error('Hexagon path has no points.');
-  let x = 0;
-  let y = 0;
-  for (let i = 0; i < n; i++) {
-    x += nums[2 * i];
-    y += nums[2 * i + 1];
-  }
-  return { x: x / n, y: y / n };
+/** Neighborhoods with a price, which are the ones that can be chosen, sorted by name. */
+export function choosable(hoods: HoodCollection): HoodFeature[] {
+  return hoods.features
+    .filter((f) => f.properties.ppm2 !== undefined)
+    .sort((a, b) => a.properties.name.localeCompare(b.properties.name, 'en'));
 }
 
 /** Find a neighborhood by what the user typed: trimmed, ignoring case. Null when nothing matches. */
-export function resolveNeighborhood(text: string, list: Neighborhood[]): Neighborhood | null {
+export function resolveHood(text: string, list: HoodFeature[]): HoodFeature | null {
   const t = text.trim().toLowerCase();
   if (t === '') return null;
-  return list.find((n) => n.label.toLowerCase() === t) ?? null;
+  return list.find((f) => f.properties.name.toLowerCase() === t) ?? null;
 }
 
-/** "ferdowsi" or "shaharak-e-moslemin" as a readable name, for slugs that have no label. */
-export function slugTitle(slug: string): string {
-  return slug.split('-').filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+/** The price-per-m² limits between five equal-sized groups of neighborhoods, rounded. */
+export function priceBands(list: HoodFeature[]): number[] {
+  const v = list.map((f) => f.properties.ppm2 as number).sort((a, b) => a - b);
+  return [0.2, 0.4, 0.6, 0.8].map((q) => v[Math.floor(v.length * q)]);
+}
+
+function quantile(sorted: number[], q: number): number {
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+export interface SimilarRange {
+  low: number;
+  high: number;
+  count: number;
+  /** Plain words for which ads these are. */
+  source: string;
+}
+
+/** At least this many ads before a range is shown. */
+export const MIN_SIMILAR = 15;
+
+/**
+ * The middle half of the prices of similar ads from November and December 2024: first ads of a
+ * similar size in the same neighborhood, then a wider size window there, then similar sizes across
+ * the city. Only the range is shown, never a single ad.
+ */
+export function similarRange(similar: SimilarAds, hood: HoodFeature | null, area: number): SimilarRange | null {
+  const tiers: Array<{ ads: Array<[number, number]>; window: number; where: string }> = [];
+  if (hood) {
+    const here = similar[String(hood.id)] ?? [];
+    tiers.push({ ads: here, window: 15, where: `in ${hood.properties.name}` });
+    tiers.push({ ads: here, window: 30, where: `in ${hood.properties.name}` });
+  }
+  tiers.push({ ads: Object.values(similar).flat(), window: 10, where: 'across Tehran' });
+  for (const t of tiers) {
+    const lo = Math.max(0, area - t.window);
+    const hi = area + t.window;
+    const prices = t.ads.filter(([a]) => a >= lo && a <= hi).map(([, p]) => p).sort((a, b) => a - b);
+    if (prices.length >= MIN_SIMILAR) {
+      return {
+        low: quantile(prices, 0.25),
+        high: quantile(prices, 0.75),
+        count: prices.length,
+        source: `The middle half of ${prices.length.toLocaleString('en-US')} ads for ${Math.round(lo)} to ${Math.round(hi)} m² ${t.where}, November and December 2024.`,
+      };
+    }
+  }
+  return null;
 }
 
 const MINUS = '−';
@@ -86,7 +135,7 @@ export function signed(value: number, decimals = 2): string {
 }
 
 /**
- * A model value for the listings table. Raw model output can be below 0, which is not a price,
+ * A model value for a table of ads. Raw model output can be below 0, which is not a price,
  * and values from 0 up to 0.5 are below the cheapest apartment the model learned from.
  */
 export function modelCell(value: number): string {
@@ -95,35 +144,7 @@ export function modelCell(value: number): string {
   return value.toFixed(2);
 }
 
-/** The plain-words sentence about the typical miss on listings the model never trained on. */
-export function gapSentence(gap: SiteModel['held_out_gap']): string {
-  const billions = gap.median_billions.toFixed(1);
-  const share = (gap.median_share_of_price * 100).toFixed(1);
-  return `On listings it never trained on, the model was typically off by about ${billions} billion toman (${share}% of the price).`;
-}
-
-/** Four listings starting at page * 4, wrapping around the list. */
-export function listingPage(listings: Listing[], page: number, size = 4): Listing[] {
-  if (listings.length === 0) return [];
-  const out: Listing[] = [];
-  for (let i = 0; i < Math.min(size, listings.length); i++) {
-    out.push(listings[(page * size + i) % listings.length]);
-  }
-  return out;
-}
-
-/** Opacity for each hexagon from its rank by price, so a few very dear cells do not wash out the rest. */
-export function hexOpacities(hexes: Hex[]): number[] {
-  const order = hexes.map((h, i) => ({ v: h.value, i })).sort((a, b) => a.v - b.v);
-  const out = new Array<number>(hexes.length).fill(0.12);
-  const last = Math.max(1, order.length - 1);
-  order.forEach((o, rank) => {
-    out[o.i] = 0.12 + (rank / last) * 0.75;
-  });
-  return out;
-}
-
-async function getJson(url: string): Promise<unknown> {
+export async function getJson(url: string): Promise<unknown> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Could not load ${url.split('/').pop()} (HTTP ${res.status}).`);
   try {
@@ -133,13 +154,8 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
-function list<T>(data: unknown, name: string): T[] {
-  if (!Array.isArray(data)) throw new Error(`${name} is malformed: expected a list.`);
-  return data as T[];
-}
-
-/** Check the extra fields this page reads from the model file. */
-function assertSiteModel(m: Model): asserts m is SiteModel {
+/** Check the extra fields the pages read from the model file. */
+export function assertSiteModel(m: Model): asserts m is SiteModel {
   const gap = m.held_out_gap;
   if (!gap || !Number.isFinite(gap.median_billions) || !Number.isFinite(gap.median_share_of_price)) {
     throw new Error('Model file is malformed: held_out_gap');
@@ -154,20 +170,17 @@ function assertSiteModel(m: Model): asserts m is SiteModel {
 }
 
 /** Load everything the Estimate page needs. Rejects with a readable message if any file fails. */
-export async function loadSiteData(base: string): Promise<SiteData> {
+export async function loadEstimateData(base: string): Promise<EstimateData> {
   const url = (f: string) => `${base}data/${f}`;
-  const [model, neighborhoods, hexes, listings] = await Promise.all([
+  const [model, hoods, similar] = await Promise.all([
     loadModel(url('model.json')),
-    getJson(url('neighborhoods.json')),
-    getJson(url('hexes.json')),
-    getJson(url('listings.json')),
+    getJson(url('neighborhoods.geojson')),
+    getJson(url('similar.json')),
   ]);
   assertSiteModel(model);
   monthLabel(model.date_range.end);
-  return {
-    model,
-    neighborhoods: list<Neighborhood>(neighborhoods, 'neighborhoods.json'),
-    hexes: list<Hex>(hexes, 'hexes.json'),
-    listings: list<Listing>(listings, 'listings.json'),
-  };
+  const h = hoods as HoodCollection;
+  if (!h || !Array.isArray(h.features)) throw new Error('neighborhoods.geojson is malformed.');
+  if (!similar || typeof similar !== 'object') throw new Error('similar.json is malformed.');
+  return { model, hoods: h, similar: similar as SimilarAds };
 }

@@ -19,7 +19,7 @@ Cleaned Tehran apartment asking-price data used to train the model. Produced by 
 | `price` | `price_value / 1e9` |
 | `price_per_m2` | `price_value / building_size / 1e6` |
 
-Titles, descriptions, user fields and coordinates are not in the frame returned by `clean`. Latitude and longitude exist only in `clean_with_coords` (as `lat`, `lon`), which is for building hexagon features in training and is never shipped.
+Titles, descriptions, user fields and coordinates are not in the frame returned by `clean`. Latitude and longitude exist only in `clean_with_coords` (as `lat`, `lon`), which is used only to place ads in official neighborhoods for the map (`training/neighborhoods.py`) and is never shipped.
 
 ## Cleaning funnel
 
@@ -161,7 +161,9 @@ The lambda choice is close to a tie: 17.0441 at lambda 100 against 17.0652 at la
 
 ### Limits of the map
 
-Hexagons use training rows with coordinates only: 33,292 of 48,332, of which 32,868 fall inside the Tehran outline. 148 hexagons have at least 30 listings. In two of them the most common slug (`ferdowsi`, `shaharak-e-moslemin`) has no entry in the lookup, so choosing them uses the Tehran median.
+The map uses Tehran's official neighborhoods from OpenStreetMap (admin_level 11, ODbL; the boundary file in `data/osm/` records its OSM date). An ad belongs to the neighborhood whose boundary contains its coordinates. 61,152 of the 81,603 cleaned ads have coordinates, and 60,076 of those fall inside one of the 377 neighborhoods. 339 neighborhoods have at least 15 ads, enough to show a median price and to be chosen on the Estimate page.
+
+The model was trained on Divar's own neighborhood names, so each official neighborhood hands the model the Divar name most of its ads use. For 37 of the 339, that Divar name has fewer than 30 training ads, so the model uses the Tehran median there. The "similar ads then" range on the Estimate page comes from the November and December ads inside the chosen neighborhood; only the middle half of their prices is shown, never a single ad.
 
 <!-- training results: written by training/train.py -->
 ### Chosen model and held-out result (generated)

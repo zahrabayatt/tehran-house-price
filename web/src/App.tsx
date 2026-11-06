@@ -14,7 +14,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<EstimatePage />} />
           <Route
-            path="lab"
+            path="lab/:step?"
             element={
               <Suspense
                 fallback={
