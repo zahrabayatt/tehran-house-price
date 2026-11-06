@@ -18,7 +18,6 @@ import math
 import platform
 import sys
 import time
-from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,9 +28,7 @@ from training.experiments import time_dot
 from training.features import (build_matrix, location_lookup, split_by_month,
                                zscore_apply, zscore_fit)
 from training.model import compute_cost, gradient_descent
-from training.prep import (AREA_HIGH, AREA_LOW, COORD_COLUMNS, PPM2_HIGH, PPM2_LOW, RAW,
-                           TOMAN_PER_BILLION, TOMAN_PER_MILLION, WINDOW_END,
-                           WINDOW_START, run_clean)
+from training.prep import COORD_COLUMNS, RAW, run_clean
 
 ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = ROOT / "model" / "model.json"
@@ -80,30 +77,8 @@ CANDIDATES = tuple((s, lam) for s in SUBSETS for lam in LAMBDAS)
 
 HISTORY_POINTS = 120
 CONVERGED_RELATIVE = 1e-7  # cost change over the last 100 updates
-MIN_HEX_ROWS = 30
 LISTING_COUNT = 60
 LISTING_FIELDS = {"neighborhood", "area", "rooms", "age", "asked", "model", "difference"}
-SAMPLE_COUNT = 500
-SAMPLE_FIELDS = {"area", "rooms", "age", "parking", "elevator", "storage", "price"}
-DIRTY_PER_SIDE = 12
-
-# Same grid as the constructor in docs/design/Main.dc.html.
-HEX_R = 7
-_DX, _DY = HEX_R * 1.732, HEX_R * 1.5
-_ROWS, _COLS = 26, 28
-# Provenance: the Nominatim boundary of Tehran city (OpenStreetMap, ODbL), simplified and
-# in the map's own coordinates (the same outline as web/src/components/PriceMap.tsx).
-TEHRAN_POLYGON = [
-    [264, 305], [282, 311], [293, 323], [342, 344], [341, 351], [344, 357], [385, 380],
-    [397, 393], [404, 395], [432, 391], [436, 393], [441, 406], [443, 419], [459, 412],
-    [468, 421], [471, 420], [462, 402], [462, 394], [471, 388], [487, 395], [490, 377],
-    [487, 370], [493, 367], [499, 354], [489, 339], [483, 338], [493, 329], [493, 322],
-    [507, 324], [513, 321], [524, 326], [521, 323], [539, 320], [533, 317], [543, 304],
-    [529, 299], [517, 287], [501, 282], [502, 272], [507, 269], [503, 259], [499, 261],
-    [490, 254], [481, 251], [466, 248], [459, 255], [446, 248], [442, 256], [425, 261],
-    [419, 262], [422, 271], [411, 264], [402, 271], [398, 260], [393, 271], [383, 276],
-    [377, 281], [366, 277], [357, 279], [351, 286], [341, 292], [319, 291], [312, 288],
-    [275, 300], [267, 295]]
 
 CARD_BEGIN = "<!-- training results: written by training/train.py -->"
 CARD_END = "<!-- end of training results -->"
@@ -283,79 +258,9 @@ def train_model(df: pd.DataFrame, candidates=CANDIDATES, alpha: float = ALPHA,
                         "os": platform.platform()},
         "candidates": records,
     }
-    return {"model": model, "listings": build_listings(held, held_pred),
+    return {"model": model,
             "train": train, "selection": selection, "held_out": held,
             "held_pred": held_pred}
-
-
-# --- hexagons -----------------------------------------------------------------
-
-def project(lon, lat):
-    """Longitude and latitude to the design map's coordinates."""
-    return (lon - 50.6) / 1.6 * 864, (36.2 - lat) / 1.2 * 800
-
-
-def inside(x: float, y: float) -> bool:
-    """Ray casting, the same test as `inside` in Main.dc.html."""
-    c, poly = False, TEHRAN_POLYGON
-    j = len(poly) - 1
-    for i in range(len(poly)):
-        a, b = poly[i], poly[j]
-        if (a[1] > y) != (b[1] > y) and x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]:
-            c = not c
-        j = i
-    return c
-
-
-def grid_centers() -> np.ndarray:
-    return np.array([(256 + col * _DX + (_DX / 2 if row % 2 else 0), 244 + row * _DY)
-                     for row in range(_ROWS) for col in range(_COLS)])
-
-
-def hex_path(x: float, y: float) -> str:
-    """Pointy-top hexagon path, formatted like the design's SVG paths."""
-    points = []
-    for k in range(6):
-        t = math.pi / 3 * k + math.pi / 6
-        points.append(f"{x + HEX_R * math.cos(t):.1f} {y + HEX_R * math.sin(t):.1f}")
-    return "M" + " L".join(points) + " Z"
-
-
-def build_hexes(train_coords: pd.DataFrame, min_rows: int = MIN_HEX_ROWS) -> list[dict]:
-    """Median price per m2 in each hexagon with enough training listings.
-
-    Only the grid center, the median and the most common slug leave this function.
-    """
-    known = train_coords[train_coords["lat"].notna() & train_coords["lon"].notna()]
-    centers = grid_centers()
-    px, py = project(known["lon"].to_numpy(float), known["lat"].to_numpy(float))
-    nearest = np.empty(len(known), dtype=int)
-    dist2 = np.empty(len(known))
-    for start in range(0, len(known), 4096):   # chunks keep the distance matrix small
-        dx = px[start:start + 4096, None] - centers[:, 0]
-        dy = py[start:start + 4096, None] - centers[:, 1]
-        d2 = dx * dx + dy * dy
-        nearest[start:start + 4096] = d2.argmin(axis=1)
-        dist2[start:start + 4096] = d2.min(axis=1)
-    keep = dist2 <= HEX_R * HEX_R
-    prices = known["price_per_m2"].to_numpy(float)[keep]
-    slugs = known["neighborhood"].to_numpy(object)[keep]
-    cells = nearest[keep]
-
-    out = []
-    for cell in np.unique(cells):
-        x, y = centers[cell]
-        if not inside(x, y):
-            continue
-        mask = cells == cell
-        if mask.sum() < min_rows:
-            continue
-        counts = Counter(s for s in slugs[mask] if isinstance(s, str))
-        # Highest count first, alphabetical on a tie, so the result is stable.
-        slug = min(counts, key=lambda s: (-counts[s], s)) if counts else None
-        out.append({"d": hex_path(x, y), "value": round(float(np.median(prices[mask])), 1),
-                    "neighborhood": slug})
-    return out
 
 
 # --- exports ------------------------------------------------------------------
@@ -366,56 +271,10 @@ def label(slug) -> str:
     return slug.replace("-", " ").replace("_", " ").title()
 
 
-def build_neighborhoods(lookup: dict[str, float]) -> list[dict]:
-    rows = [{"id": k, "label": label(k), "median": round(float(v), 2)}
-            for k, v in lookup.items()]
-    return sorted(rows, key=lambda r: (r["label"], r["id"]))
-
-
 def pick_listings(held: pd.DataFrame, n: int = LISTING_COUNT, seed: int = SEED) -> pd.DataFrame:
     """Random rows. Takes no predictions, so the pick cannot depend on error size."""
     picks = np.random.default_rng(seed).choice(len(held), min(n, len(held)), replace=False)
     return held.iloc[np.sort(picks)]
-
-
-def build_listings(held: pd.DataFrame, pred: np.ndarray) -> list[dict]:
-    pred = pd.Series(pred, index=held.index)
-    rows = []
-    for idx, r in pick_listings(held).iterrows():
-        asked, model = round(float(r["price"]), 2), round(float(pred[idx]), 2)
-        rows.append({"neighborhood": label(r["neighborhood"]),
-                     "area": round(float(r["area"]), 1), "rooms": int(r["rooms"]),
-                     "age": int(r["age"]), "asked": asked, "model": model,
-                     "difference": round(model - asked, 2)})
-    return rows
-
-
-def build_sample(train: pd.DataFrame, n: int = SAMPLE_COUNT, seed: int = SEED) -> list[dict]:
-    picks = np.random.default_rng(seed).choice(len(train), min(n, len(train)), replace=False)
-    return [{"area": round(float(r["area"]), 1), "rooms": int(r["rooms"]), "age": int(r["age"]),
-             "parking": int(r["parking"]), "elevator": int(r["elevator"]),
-             "storage": int(r["storage"]), "price": round(float(r["price"]), 3)}
-            for _, r in train.iloc[np.sort(picks)].iterrows()]
-
-
-def dirty_prices(raw: pd.DataFrame, per_side: int = DIRTY_PER_SIDE, seed: int = SEED) -> list[float]:
-    """Prices of real ads the price-per-m2 bounds remove, in billions. Bare numbers.
-
-    Taken from ads inside the window with a plausible area, half from below the low
-    bound and half from above the high bound, drawn at random.
-    """
-    month = pd.to_datetime(raw["created_at_month"], errors="coerce").dt.strftime("%Y-%m")
-    area = pd.to_numeric(raw["building_size"], errors="coerce")
-    price = pd.to_numeric(raw["price_value"], errors="coerce")
-    usable = (month >= WINDOW_START) & (month <= WINDOW_END) & area.between(AREA_LOW, AREA_HIGH) & (price > 0)
-    ppm2 = price[usable] / area[usable] / TOMAN_PER_MILLION
-    rng = np.random.default_rng(seed)
-    out: list[float] = []
-    for side in (ppm2 < PPM2_LOW, ppm2 > PPM2_HIGH):
-        values = np.sort(price[usable][side].unique())
-        picks = rng.choice(len(values), min(per_side, len(values)), replace=False)
-        out += [float(v) / TOMAN_PER_BILLION for v in values[np.sort(picks)]]
-    return out
 
 
 def build_profile(df: pd.DataFrame, raw: pd.DataFrame, model: dict) -> dict:
@@ -562,9 +421,7 @@ def main() -> None:
     months = sorted(frame["month"].unique())
     assert months[0] == "2024-05" and months[-1] == "2024-12", months
 
-    train_coords, _, _ = split_by_month(frame)
-    hexes = build_hexes(train_coords)
-    # Coordinates end here. Nothing below can see them.
+    # Coordinates stay out of training: only site_data uses them, to place ads in neighborhoods.
     df = frame.drop(columns=COORD_COLUMNS)
 
     result = train_model(df)
@@ -573,15 +430,11 @@ def main() -> None:
 
     sizes = {
         "model/model.json": write_json(MODEL_PATH, model),
-        "hexes.json": write_json(DATA_DIR / "hexes.json", hexes),
-        "listings.json": write_json(DATA_DIR / "listings.json", result["listings"]),
-        "sample.json": write_json(DATA_DIR / "sample.json", {
-            "rows": build_sample(train), "dirty_prices": dirty_prices(raw)}),
         "funnel.json": write_json(DATA_DIR / "funnel.json", steps),
         "profile.json": write_json(DATA_DIR / "profile.json", build_profile(df, raw, model)),
-        "neighborhoods.json": write_json(DATA_DIR / "neighborhoods.json",
-                                         build_neighborhoods(model["location"]["lookup"])),
     }
+    from training.site_data import write_all  # site_data imports this module
+    sizes.update(write_all(frame, raw, model))
     update_card(CARD_PATH, card_body(model, held["price"].to_numpy(dtype=float),
                                      result["held_pred"], _baselines(train, held)))
 
@@ -589,8 +442,6 @@ def main() -> None:
     print("cost:", model["cost"], "sklearn:", model["sklearn_cost"])
     print("gap:", model["held_out_gap"])
     print("runtime_ms:", model["runtime_ms"])
-    print("hexes:", len(hexes), "not in lookup:",
-          sum(h["neighborhood"] not in model["location"]["lookup"] for h in hexes))
     print("sizes:", sizes, "total", sum(sizes.values()))
 
 

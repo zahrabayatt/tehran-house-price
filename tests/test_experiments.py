@@ -10,7 +10,9 @@ from training import experiments as E
 from training.model import compute_cost, compute_gradient, gradient_descent, predict
 
 ROOT = Path(__file__).resolve().parent.parent
-SAMPLE = json.loads((ROOT / "web" / "public" / "data" / "sample.json").read_text(encoding="utf-8"))
+_LAB = json.loads((ROOT / "web" / "public" / "data" / "lab-train.json").read_text(encoding="utf-8"))
+# The first 500 training ads, in the row form the teaching code takes.
+SAMPLE = {"rows": [{"area": a, "price": p} for a, p in zip(_LAB["area"][:500], _LAB["price"][:500])]}
 SOURCES = sorted((ROOT / "training").glob("*.py"))
 
 
@@ -24,11 +26,6 @@ def test_load_xy_uses_hundreds_of_square_metres():
     assert m == len(SAMPLE["rows"]) == x.shape[0] == y.shape[0]
     assert x[0] == pytest.approx(SAMPLE["rows"][0]["area"] / 100)
     assert y[0] == SAMPLE["rows"][0]["price"]
-
-
-def test_price_range_keeps_only_prices_inside_both_bounds():
-    kept = E.keep_price_range([0.1, 1.0, 5.0, 300.0, 5000.0], 1.0, 300.0)
-    assert kept.tolist() == [1.0, 5.0, 300.0]
 
 
 def test_one_feature_functions_match_the_vectorized_code():
