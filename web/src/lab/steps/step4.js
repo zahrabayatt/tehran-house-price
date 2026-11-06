@@ -157,7 +157,7 @@ export function mount(ctx) {
   }
   function paintDots() {
     const c = fit(cv, svg);
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     c.globalAlpha = 0.06;
     for (const [a, p] of P) {
       const x = a / 100;
@@ -239,7 +239,7 @@ export function mount(ctx) {
     c.lineTo(fl[0], fl[1]);
     c.stroke();
     c.setLineDash([]);
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     c.beginPath();
     c.arc(cur[0], cur[1], drag && drag.k === 'bowldot' ? 12 : 10, 0, 6.283);
     c.fill();

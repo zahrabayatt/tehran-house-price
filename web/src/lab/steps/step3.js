@@ -93,7 +93,7 @@ export function mount(ctx) {
     const c = cv.getContext('2d');
     c.setTransform(dpr * s, 0, 0, dpr * s, 0, 0);
     c.clearRect(0, 0, 620, 380);
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     c.globalAlpha = 0.07;
     for (const [a, p] of P) {
       const x = a / 100;

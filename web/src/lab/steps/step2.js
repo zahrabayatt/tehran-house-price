@@ -122,7 +122,7 @@ export function mount(ctx) {
     const c = cv.getContext('2d');
     c.setTransform(dpr * s, 0, 0, dpr * s, 0, 0);
     c.clearRect(0, 0, 620, 400);
-    const cs = getComputedStyle(document.documentElement),
+    const cs = getComputedStyle(document.getElementById('main')),
       ok = cs.getPropertyValue('--ac').trim(),
       no = cs.getPropertyValue('--warn').trim();
     let kept = 0,
