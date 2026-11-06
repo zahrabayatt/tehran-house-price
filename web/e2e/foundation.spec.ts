@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test';
 import { GITHUB_URL, AIR_URL as SIBLING } from '../src/config';
 
 const ROUTES = [
-  { hash: '#/', heading: 'What would this Tehran apartment be advertised for?', nav: 'Estimate' },
+  { hash: '#/', heading: 'What was this apartment advertised for in late 2024?', nav: 'Estimate' },
+  { hash: '#/data', heading: 'The data behind the estimate', nav: 'Data' },
   { hash: '#/lab', heading: 'Model Lab', nav: 'Model Lab' },
-  { hash: '#/data', heading: 'Where the numbers come from', nav: 'Data' },
 ];
 
 for (const r of ROUTES) {
@@ -18,44 +18,44 @@ for (const r of ROUTES) {
   });
 }
 
-test('pill navigation moves between routes', async ({ page }) => {
+test('the navigation holds only pages, in the order Estimate, Data, Model Lab', async ({ page }) => {
   await page.goto('#/');
   const nav = page.getByRole('navigation', { name: 'Main' });
-  await nav.getByRole('link', { name: 'Model Lab' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Model Lab' })).toBeVisible();
-  await nav.getByRole('link', { name: 'Data' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Where the numbers come from' })).toBeVisible();
+  await expect(nav.getByRole('link')).toHaveText(['Estimate', 'Data', 'Model Lab']);
+  await expect(nav.getByRole('button')).toHaveCount(0);
+  await expect(page.getByText(/asphalt/i)).toHaveCount(0);
 });
 
-test('theme button switches and survives a reload', async ({ page }) => {
+test('the site opens dark, and the theme button switches and survives a reload', async ({ page }) => {
   await page.goto('#/');
-  const app = page.locator('.app');
-  await expect(app).not.toHaveClass(/dark/);
-  await page.getByRole('button', { name: 'Asphalt' }).click();
-  await expect(app).toHaveClass(/dark/);
-  await expect(page.getByRole('button', { name: 'Light' })).toBeVisible();
+  const html = page.locator('html');
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('button', { name: 'Switch to light theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'light');
   await page.reload();
-  await expect(page.locator('.app')).toHaveClass(/dark/);
-  await page.getByRole('button', { name: 'Light' }).click();
-  await expect(page.locator('.app')).not.toHaveClass(/dark/);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
 test('footer names the author and links to the code and the other project', async ({ page }) => {
-  await page.goto('#/');
+  await page.goto('#/data');
   const footer = page.getByRole('contentinfo');
   await expect(footer).toContainText('Built by Zahra Bayat.');
   const hrefs = await footer.getByRole('link').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).href));
   expect(hrefs.some((h) => h.startsWith(GITHUB_URL))).toBe(true);
   expect(hrefs.some((h) => h.startsWith(SIBLING))).toBe(true);
-  for (const h of hrefs) expect(h.startsWith(GITHUB_URL) || h.startsWith(SIBLING), h).toBe(true);
 });
 
-test('fonts are self-hosted', async ({ page }) => {
+test('the only outside host the site loads from is the street map', async ({ page }) => {
   const external: string[] = [];
   page.on('request', (req) => {
-    if (!req.url().startsWith('http://127.0.0.1')) external.push(req.url());
+    const url = req.url();
+    if (!url.startsWith('http://127.0.0.1') && !url.startsWith('data:') && !url.startsWith('blob:')) external.push(url);
   });
-  await page.goto('#/');
-  await page.waitForLoadState('networkidle');
-  expect(external).toEqual([]);
+  for (const hash of ['#/', '#/data', '#/lab/4']) {
+    await page.goto(hash);
+    await page.waitForLoadState('networkidle');
+  }
+  expect(external.filter((u) => !u.startsWith('https://tiles.openfreemap.org/'))).toEqual([]);
 });

@@ -22,7 +22,9 @@ function buildCommit(): string {
 export default defineConfig({
   base: '/tehran-house-price/',
   define: { __COMMIT__: JSON.stringify(buildCommit()) },
-  plugins: [react(), codeSnippets({ trainingDir: '../training', stagesDir: 'src/lab/stages' })],
+  // MapLibre is one library of about 800 kB; it loads on its own, after the estimate is shown.
+  build: { chunkSizeWarningLimit: 900 },
+  plugins: [react(), codeSnippets({ trainingDir: '../training', stagesDir: 'src/lab/steps' })],
   test: {
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],

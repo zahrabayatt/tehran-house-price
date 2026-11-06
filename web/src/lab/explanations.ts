@@ -8,17 +8,18 @@
  */
 export const EXPLANATIONS: Record<string, Record<string, string>> = {
   load_xy: {
-    'def load_xy(rows):': 'Takes the sample listings as a list of dictionaries.',
+    'def load_xy(rows):': 'Takes the training ads as a list of dictionaries.',
     '    x_train = np.array([r["area"] for r in rows]) / 100': 'Area in hundreds of m², so values stay near 1.',
     '    y_train = np.array([r["price"] for r in rows])': 'Asking price in billions.',
     '    m = x_train.shape[0]': 'shape[0] is the number of rows.',
   },
 
-  price_bounds: {
-    'def keep_price_range(prices, low, high):': 'Returns only the prices inside the bounds.',
-    '    prices = np.asarray(prices, dtype=float)': 'Accepts a list or an array.',
-    '    keep = (prices >= low) & (prices <= high)': 'True for every price inside both bounds. The & means "and", element by element.',
-    '    return prices[keep]': 'Indexing with a row of True and False keeps the True ones.',
+  clean_bounds: {
+    '    d = d[d["area"].between(area_low, area_high)]': 'Keep ads from 25 to 600 m². between() includes both ends.',
+    '    record(f"Area outside {area_low:g} to {area_high:g} m2", d)': 'Count what this step removed, for the Data page.',
+    '    ppm2 = d["raw_price"] / d["area"] / TOMAN_PER_MILLION': 'Price per m², in million toman, for every remaining ad at once.',
+    '    d = d[ppm2.between(low, high)]': 'Keep ads from 12 to 600 million toman per m². This catches typos the price alone would hide.',
+    '    record(f"Price per m2 outside {low:g} to {high:g} million toman", d)': 'Count what this step removed.',
   },
 
   predict_one: {

@@ -1,10 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Estimate Tehran apartment asking prices with a linear regression written from scratch, and learn how it works." />
     <title>Tehran House Price</title>
+    <script>
+      // Dark unless the visitor chose light, set before the first paint so the page never flashes.
+      try { if (localStorage.getItem('thp-theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
