@@ -114,7 +114,7 @@ export function mount(ctx) {
   }
   function drawScatter() {
     const c = fitCanvas();
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ch').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ch').trim();
     c.globalAlpha = 0.12;
     for (const r of D.rows) {
       if (r[0] > PM || r[1] > PM) continue;

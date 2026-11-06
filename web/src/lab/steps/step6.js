@@ -196,7 +196,7 @@ export function mount(ctx) {
   }
   function paintDots() {
     const c = fit(cv, svg, 380);
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     c.globalAlpha = 0.06;
     for (const [a, p] of P) {
       const x = a / 100;

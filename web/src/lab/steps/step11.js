@@ -193,7 +193,7 @@ export function mount(ctx) {
     document.getElementById('hF').textContent = C.lab;
     document.getElementById('hJ').textContent = F.J.toFixed(2);
     const c = fitCanvas();
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     c.globalAlpha = 0.07;
     for (const r of D.rows) {
       const x = C.X(r);

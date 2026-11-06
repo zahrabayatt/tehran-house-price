@@ -272,7 +272,7 @@ export function mount(ctx) {
       { x: (SL + SR) / 2, y: TOP + 4 * ROW + 32, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--mut)' },
       mode === 'raw' ? 'Value as written in the ad' : 'Scaled value: spreads from the mean',
     );
-    const ac = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    const ac = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     for (let j = 0; j < 4; j++) {
       const yc = TOP + j * ROW + ROW / 2 - 6;
       el(ssv, 'text', { x: 0, y: yc - 2, 'font-size': 14, 'font-weight': 600, fill: 'var(--ink)' }, FEAT[j][0]);

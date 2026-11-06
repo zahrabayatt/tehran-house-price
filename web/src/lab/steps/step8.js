@@ -213,7 +213,7 @@ export function mount(ctx) {
   function paintScatter() {
     const c = fit(cv, svg, 380),
       w = hist[k].w;
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ac').trim();
     c.globalAlpha = 0.07;
     for (const r of D) {
       if (r[4] > PM) continue;

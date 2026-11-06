@@ -8,7 +8,14 @@
   gap: 24px;
   align-items: start;
 }
-.lab-nav { position: sticky; top: 84px; font-size: 14px; max-height: calc(100vh - 100px); overflow-y: auto; }
+.lab-nav { position: sticky; top: 84px; font-size: 14px; max-height: calc(100vh - 100px); overflow-y: auto; scrollbar-width: none; }
+/* On a short window the list scrolls with the wheel, without a scrollbar of its own. */
+.lab-nav::-webkit-scrollbar { display: none; }
+@media (max-height: 820px) {
+  .lab-nav h1 { font-size: 20px; margin-bottom: 8px; }
+  .lab-nav p { margin: 8px 0 2px; }
+  .lab-nav a { padding: 3px 10px; }
+}
 .lab-nav h1 { font-size: 22px; margin: 0 0 14px; letter-spacing: -0.02em; }
 .lab-nav p { margin: 14px 0 4px; color: var(--mut); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
 .lab-nav a {
