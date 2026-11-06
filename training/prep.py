@@ -114,12 +114,14 @@ def _funnel(df: pd.DataFrame, low: float, high: float,
     d = d[d[[name for _, name in _FLAGS]].notna().all(axis=1)]
     record("Parking, elevator or storage flag missing", d)
 
+    # lab:clean_bounds
     d = d[d["area"].between(area_low, area_high)]
     record(f"Area outside {area_low:g} to {area_high:g} m2", d)
 
     ppm2 = d["raw_price"] / d["area"] / TOMAN_PER_MILLION
     d = d[ppm2.between(low, high)]
     record(f"Price per m2 outside {low:g} to {high:g} million toman", d)
+    # endlab
 
     out = pd.DataFrame({
         "area": d["area"].astype(float),

@@ -36,14 +36,6 @@ def load_xy(rows):
 # endlab
 
 
-# lab:price_bounds
-def keep_price_range(prices, low, high):
-    prices = np.asarray(prices, dtype=float)
-    keep = (prices >= low) & (prices <= high)
-    return prices[keep]
-# endlab
-
-
 # lab:predict_one
 def predict_one(x, w, b):
     m = x.shape[0]

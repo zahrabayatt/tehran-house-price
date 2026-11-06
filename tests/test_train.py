@@ -245,76 +245,12 @@ def test_plain_gap():
     assert not any(re.search(r"mse|rmse|mae|l1|l2", k, re.I) for k in g)
 
 
-# --- hexagons ------------------------------------------------------------------
-
-def test_project_matches_design_transform():
-    assert T.project(50.6, 36.2) == (0.0, 0.0)
-    x, y = T.project(51.4, 35.7)
-    assert x == pytest.approx(432.0) and y == pytest.approx(800 * 0.5 / 1.2)
-
-
-def test_grid_and_path_match_the_design_constructor():
-    grid = T.grid_centers()
-    assert len(grid) == 26 * 28
-    assert tuple(grid[0]) == (256.0, 244.0)
-    # row 1 is offset by half of dx = 7 * 1.732
-    assert tuple(grid[28]) == pytest.approx((256 + 7 * 1.732 / 2, 244 + 10.5))
-    assert T.inside(400, 300) and not T.inside(256, 244)
-    d = T.hex_path(400.0, 300.0)
-    assert d.startswith("M406.1 303.5 L400.0 307.0 L")
-    assert d.endswith(" Z") and d.count(" L") == 5
-
-
-def geo_rows(cx, cy, n, price=50.0, hood="a"):
-    """n rows projected exactly to design point (cx, cy)."""
-    lon = 50.6 + cx / 864 * 1.6
-    lat = 36.2 - cy / 800 * 1.2
-    return pd.DataFrame({"lat": [lat] * n, "lon": [lon] * n,
-                         "price_per_m2": [price] * n, "neighborhood": [hood] * n})
-
-
-def center_inside(k=0):
-    return [tuple(c) for c in T.grid_centers() if T.inside(*c)][k]
-
-
-def test_hex_needs_thirty_listings():
-    a, b = center_inside(40), center_inside(60)
-    df = pd.concat([geo_rows(*a, 29), geo_rows(*b, 30)], ignore_index=True)
-    hexes = T.build_hexes(df)
-    assert [h["d"] for h in hexes] == [T.hex_path(*b)]
-
-
-def test_hex_value_is_median_and_label_is_most_common_slug():
-    c = center_inside(40)
-    df = pd.concat([geo_rows(*c, 20, 10.0, "north"), geo_rows(*c, 11, 90.0, "south"),
-                    geo_rows(*c, 1, 95.0, "east")], ignore_index=True)
-    hexes = T.build_hexes(df)
-    assert hexes == [{"d": T.hex_path(*c), "value": 10.0, "neighborhood": "north"}]
-    assert set(hexes[0]) == {"d", "value", "neighborhood"}
-
-
-def test_rows_without_coordinates_or_outside_the_polygon_are_ignored():
-    outside = next(tuple(c) for c in T.grid_centers() if not T.inside(*c))
-    c = center_inside(40)
-    df = pd.concat([geo_rows(*outside, 50), geo_rows(*c, 30),
-                    geo_rows(*c, 50).assign(lat=np.nan, lon=np.nan),
-                    geo_rows(9000.0, 9000.0, 50)], ignore_index=True)
-    hexes = T.build_hexes(df)
-    assert [h["d"] for h in hexes] == [T.hex_path(*c)]
-
-
 # --- exports -------------------------------------------------------------------
 
 def test_label_title_cases_slug():
     assert T.label("saadat-abad") == "Saadat Abad"
     assert T.label("niavaran") == "Niavaran"
     assert T.label(None) == "Unknown"
-
-
-def test_neighborhoods_sorted_by_label_and_only_from_lookup():
-    rows = T.build_neighborhoods({"zafar": 200.123, "abbas-abad": 150.5})
-    assert rows == [{"id": "abbas-abad", "label": "Abbas Abad", "median": 150.5},
-                    {"id": "zafar", "label": "Zafar", "median": 200.12}]
 
 
 def test_listing_pick_uses_seed_and_ignores_errors():
@@ -329,31 +265,14 @@ def test_listing_pick_uses_seed_and_ignores_errors():
 
 
 def test_listing_fields_and_difference_sign():
+    from training.site_data import build_listings
     res = run_small()
-    rows = res["listings"]
+    rows = build_listings(res["held_out"], res["held_pred"], {"top-hill": "Top Hill Official"})
     assert all(set(r) == T.LISTING_FIELDS for r in rows)
     for r in rows:
         assert r["difference"] == pytest.approx(round(r["model"] - r["asked"], 2))
-    assert {r["neighborhood"] for r in rows} <= {"Cheap Town", "Mid Town", "Top Hill"}
-
-
-def test_sample_is_small_and_seeded():
-    train, _, _ = split_by_month(synthetic())
-    a, b = T.build_sample(train, n=50), T.build_sample(train, n=50)
-    assert a == b and len(a) == 50
-    assert all(set(r) == T.SAMPLE_FIELDS for r in a)
-    assert len(T.build_sample(train.head(10), n=50)) == 10
-
-
-def test_dirty_prices_are_removed_rows_as_bare_numbers():
-    raw = pd.DataFrame({
-        "created_at_month": ["2024-06-01"] * 5 + ["2023-01-01"],
-        "building_size": [100.0, 100.0, 100.0, 100.0, 5000.0, 100.0],
-        "price_value": [1e3, 5e8, 8e9, 9e13, 7e9, 1e3],   # low, low, fine, high, bad area, old
-    })
-    prices = T.dirty_prices(raw, per_side=5)
-    assert sorted(prices) == [1e-6, 0.5, 90000.0]
-    assert all(isinstance(p, float) for p in prices)
+    # An official name when the Divar neighborhood has one, the Divar name otherwise.
+    assert {r["neighborhood"] for r in rows} <= {"Cheap Town", "Mid Town", "Top Hill Official"}
 
 
 def test_write_refuses_non_finite(tmp_path):
@@ -433,38 +352,15 @@ def test_model_json_alone_reproduces_held_out_cost(model):
         model["held_out_gap"]["median_billions"])
 
 
-def test_hexes_file_uses_only_grid_centers():
-    hexes = load("hexes.json")
-    assert hexes
-    allowed = {T.hex_path(*c) for c in T.grid_centers() if T.inside(*c)}
-    for h in hexes:
-        assert set(h) == {"d", "value", "neighborhood"}
-        assert h["d"] in allowed
-        assert h["value"] > 0 and isinstance(h["neighborhood"], str)
-
-
-def test_neighborhoods_file_matches_lookup(model):
-    rows = load("neighborhoods.json")
-    assert {r["id"] for r in rows} == set(model["location"]["lookup"])
-    assert [r["label"] for r in rows] == sorted(r["label"] for r in rows)
-
-
 def test_listings_file():
     rows = load("listings.json")
     assert len(rows) == 60
     assert all(set(r) == T.LISTING_FIELDS for r in rows)
 
 
-def test_sample_file():
-    s = load("sample.json")
-    assert set(s) == {"rows", "dirty_prices"}
-    assert 0 < len(s["rows"]) <= 500
-    assert all(set(r) == T.SAMPLE_FIELDS for r in s["rows"])
-    assert s["dirty_prices"] and all(isinstance(p, (int, float)) for p in s["dirty_prices"])
-
-
-@pytest.mark.parametrize("name", ["hexes.json", "listings.json", "sample.json",
-                                  "funnel.json", "neighborhoods.json"])
+@pytest.mark.parametrize("name", ["listings.json", "funnel.json", "similar.json", "lab-train.json",
+                                  "lab-clean.json", "lab-october.json", "lab-heldout.json",
+                                  "neighborhoods.geojson"])
 def test_no_forbidden_fields(name):
     keys = {k.lower() for k in walk_keys(load(name))}
     assert not keys & FORBIDDEN
@@ -502,5 +398,7 @@ def test_profile_file(model):
 
 
 def test_web_data_stays_small():
-    total = sum(f.stat().st_size for f in DATA.glob("*.json")) + MODEL.stat().st_size
-    assert total < 2_000_000
+    """The Lab ships area, price and the model's inputs for every training ad (about 1 MB),
+    so the whole folder is a few megabytes before compression, and far less over the wire."""
+    total = sum(f.stat().st_size for f in DATA.iterdir() if f.is_file()) + MODEL.stat().st_size
+    assert total < 4_500_000
