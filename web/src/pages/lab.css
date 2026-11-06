@@ -8,7 +8,7 @@
   gap: 24px;
   align-items: start;
 }
-.lab-nav { position: sticky; top: 84px; font-size: 14px; }
+.lab-nav { position: sticky; top: 84px; font-size: 14px; max-height: calc(100vh - 100px); overflow-y: auto; }
 .lab-nav h1 { font-size: 22px; margin: 0 0 14px; letter-spacing: -0.02em; }
 .lab-nav p { margin: 14px 0 4px; color: var(--mut); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
 .lab-nav a {
@@ -109,16 +109,18 @@
 .lab .ls-13 .stack div { color: var(--bg); }
 
 @media (max-width: 1000px) {
-  .lab-grid { grid-template-columns: minmax(0, 1fr); }
   .lab .code pre { white-space: pre-wrap; overflow-wrap: anywhere; }
   .lab .seg { flex-wrap: wrap; border-radius: 18px; }
   .lab .prow { min-width: 0; }
+  .lab .two, .lab .meter { grid-template-columns: 1fr; }
+  .lab .code { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .lab-grid { grid-template-columns: minmax(0, 1fr); }
   /* On a phone the step list is one row that scrolls sideways, so the step itself comes first. */
-  .lab-nav { position: static; display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .lab-nav { position: static; max-height: none; display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
   .lab-nav h1 { font-size: 18px; margin: 0 8px 0 0; flex: none; }
   .lab-nav > div { display: contents; }
   .lab-nav p { display: none; }
   .lab-nav a { flex: none; border: 1px solid var(--rule); border-radius: 999px; white-space: nowrap; }
-  .lab .two, .lab .meter { grid-template-columns: 1fr; }
-  .lab .code { grid-template-columns: 1fr; }
 }

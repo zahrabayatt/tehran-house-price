@@ -51,7 +51,8 @@ input[type=range], input[type=checkbox] { accent-color: var(--ac); }
 .site-header {
   position: sticky;
   top: 0;
-  z-index: 2;
+  /* Above everything on the page, including the map's own controls. */
+  z-index: 50;
   background: var(--bg);
   border-bottom: 1px solid var(--rule);
 }
