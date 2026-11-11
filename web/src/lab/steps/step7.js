@@ -9,7 +9,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 7 of 14</span>
+      <span class="tag">Step 7 of 15</span>
       <h2 id="st">Vectorization</h2>
       <p class="goal">With many features, a prediction is many multiplications added up. A loop does them one by one; a dot product does them all at once, with the same answer, much faster.</p>
 

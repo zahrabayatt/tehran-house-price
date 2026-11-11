@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadModel } from './loadModel';
-import { predict, validateInput } from './predict';
+import { featureValue, predict, validateInput } from './predict';
 import fixtures from './fixtures.json';
 import modelJson from '../../../model/model.json';
 import type { ApartmentInput, Model } from './types';
@@ -12,11 +12,10 @@ const base: ApartmentInput = {
   area: 100, neighborhood: 'elahiyeh', rooms: 2, year: 1395,
   parking: 1, elevator: 1, storage: 0,
 };
-const group = (name: string) => name.split('^')[0] === 'area' || name.split('^')[0] === 'location';
 
 describe('parity with Python', () => {
   it('fixtures were made from this model', () => {
-    expect(fixtures.modelBias).toBe(model.bias);
+    expect(fixtures.target).toBe(model.target);
     expect(fixtures.features).toEqual(model.features);
   });
 
@@ -36,28 +35,45 @@ describe('parity with Python', () => {
       expect(Math.abs(est.total - c.expected)).toBeLessThanOrEqual(
         1e-6 * Math.max(1, Math.abs(c.expected)),
       );
-      // Grouped contributions equal the sum of the Python per-feature parts.
-      const fc = c.featureContributions as Record<string, number>;
-      const sizeExpected = Object.entries(fc)
-        .filter(([k]) => group(k)).reduce((s, [, v]) => s + v, 0);
-      const size = est.contributions.find((r) => r.label === 'Size and neighborhood')!;
-      expect(size.value).toBeCloseTo(sizeExpected, 9);
     },
   );
 });
 
-describe('contributions', () => {
-  it('baseline plus contributions equals total, and labels are as ruled', () => {
+describe('log price', () => {
+  it('the model predicts log price, so every estimate is above zero', () => {
+    expect(model.target).toBe('log_price');
     for (const c of fixtures.cases) {
-      const est = predict(model, c.input as ApartmentInput);
-      const sum = est.contributions.reduce((s, r) => s + r.value, est.baseline);
-      expect(Math.abs(sum - est.total)).toBeLessThan(1e-9);
-      expect(est.baseline).toBe(model.bias);
+      expect(predict(model, c.input as ApartmentInput).total).toBeGreaterThan(0);
     }
-    const labels = predict(model, base).contributions.map((r) => r.label);
-    expect(labels).toEqual([
-      'Size and neighborhood', 'Bedrooms', 'Building age', 'Parking', 'Elevator', 'Storage',
-    ]);
+  });
+
+  it('reads log(...) and powers in feature names, log first', () => {
+    const flat: ApartmentInput = { ...base, area: 80 };
+    expect(featureValue('log(area)', flat, 50)).toBeCloseTo(Math.log(80), 12);
+    expect(featureValue('log(location)', flat, 50)).toBeCloseTo(Math.log((80 * 50) / 1000), 12);
+    expect(featureValue('log(area)^2', flat, 50)).toBeCloseTo(Math.log(80) ** 2, 12);
+    expect(featureValue('area^2', flat, 50)).toBe(6400);
+    expect(() => featureValue('log(area', flat, 50)).toThrow();
+    expect(() => featureValue('log(bogus)', flat, 50)).toThrow();
+  });
+
+  it('a version 1 model (target price) is the weighted sum itself', () => {
+    const v1: Model = {
+      ...model, target: 'price', features: ['area'], weights: [2], bias: 10,
+      scaling: { mu: [100], sigma: [50] },
+    };
+    expect(predict(v1, { ...base, area: 150 }).total).toBe(12);
+  });
+
+  it('a 10% larger flat costs the same share more anywhere in Tehran', () => {
+    const ratio = (hood: string) => {
+      const a = predict(model, { ...base, neighborhood: hood, area: 100 }).total;
+      const b = predict(model, { ...base, neighborhood: hood, area: 110 }).total;
+      return b / a;
+    };
+    const hoods = Object.keys(model.location.lookup).slice(0, 5);
+    const first = ratio(hoods[0]);
+    for (const h of hoods) expect(ratio(h)).toBeCloseTo(first, 9);
   });
 });
 
@@ -81,14 +97,16 @@ describe('fallback neighborhood', () => {
 });
 
 describe('tooSmall', () => {
-  it('flags totals under 0.5 billion and keeps the raw total', () => {
-    // Smallest, oldest apartment in a cheap neighborhood: the linear model goes negative.
-    const tiny = predict(model, {
+  it('flags totals under 0.5 billion', () => {
+    // A model shifted down by log(10): every estimate is a tenth of the real model's.
+    const low: Model = { ...model, bias: model.bias - Math.log(10) };
+    const small: ApartmentInput = {
       area: 25, neighborhood: 'sharifabad', rooms: 1, year: 1370,
       parking: 1, elevator: 1, storage: 0,
-    });
+    };
+    const tiny = predict(low, small);
+    expect(tiny.total).toBeCloseTo(predict(model, small).total / 10, 9);
     expect(tiny.total).toBeLessThan(0.5);
-    expect(tiny.total).toBeLessThan(0);
     expect(tiny.tooSmall).toBe(true);
     expect(predict(model, base).tooSmall).toBe(false);
   });
@@ -188,6 +206,8 @@ describe('loadModel', () => {
   it('rejects on a malformed model', async () => {
     stub({ ok: true, status: 200, json: async () => ({ ...model, weights: [1, 2] }) });
     await expect(loadModel('/x')).rejects.toThrow(/weights/);
+    stub({ ok: true, status: 200, json: async () => ({ ...model, target: undefined }) });
+    await expect(loadModel('/x')).rejects.toThrow(/target/);
     stub({ ok: true, status: 200, json: async () => null });
     await expect(loadModel('/x')).rejects.toThrow(/malformed/);
   });

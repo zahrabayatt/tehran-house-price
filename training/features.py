@@ -5,8 +5,14 @@ median price per m2 (million toman) over TRAINING rows only. A neighborhood
 with fewer than `min_rows` training rows, a blank one, or one never seen in
 training uses the Tehran-wide training median instead. The feature is in
 billions of toman: area * median_price_per_m2 / 1000.
+
+A feature name is a base feature, optionally inside log(...), optionally raised
+to a power: "area", "location^2", "log(area)", "log(location)^2". The log is
+applied first, then the power.
 """
 from __future__ import annotations
+
+import re
 
 import numpy as np
 import pandas as pd
@@ -73,25 +79,44 @@ def _column(df: pd.DataFrame, base: str, lookup, fallback) -> np.ndarray:
     raise ValueError(f"unknown feature {base!r}")
 
 
+_NAME = re.compile(r"^(?:log\((?P<logged>\w+)\)|(?P<plain>\w+))(?:\^(?P<power>.*))?$")
+
+
+def parse_feature(name: str) -> tuple[str, bool, int]:
+    """(base, logged, power) for a name such as "log(area)^2" -> ("area", True, 2)."""
+    m = _NAME.match(name)
+    if not m:
+        raise ValueError(f"unknown feature {name!r}")
+    base = m["logged"] or m["plain"]
+    power = 1
+    if m["power"] is not None:
+        try:
+            power = int(m["power"])
+        except ValueError:
+            raise ValueError(f"bad power in feature {name!r}") from None
+        if power < 1:
+            raise ValueError(f"bad power in feature {name!r}")
+    return base, m["logged"] is not None, power
+
+
+def feature_base(name: str) -> str:
+    """The data column a feature is built from: "log(area)^2" -> "area"."""
+    return parse_feature(name)[0]
+
+
 def build_matrix(df: pd.DataFrame, lookup: dict[str, float], fallback: float,
                  feature_names) -> np.ndarray:
-    """Columns in the order of `feature_names`.
-
-    A name is a base feature (area, rooms, age, parking, elevator, storage,
-    location) or a power such as "location^2" or "area^2".
-    """
+    """Columns in the order of `feature_names` (see the module note for the name syntax)."""
     cols = []
     for name in feature_names:
-        base, sep, power = name.partition("^")
+        base, logged, power = parse_feature(name)
         col = _column(df, base, lookup, fallback)
-        if sep:
-            try:
-                p = int(power)
-            except ValueError:
-                raise ValueError(f"bad power in feature {name!r}") from None
-            if p < 1:
-                raise ValueError(f"bad power in feature {name!r}")
-            col = col ** p
+        if logged:
+            if (col <= 0).any():
+                raise ValueError(f"log of a value at or below zero in feature {name!r}")
+            col = np.log(col)
+        if power != 1:
+            col = col ** power
         cols.append(col)
     if not cols:
         return np.empty((len(df), 0))

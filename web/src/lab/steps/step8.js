@@ -10,7 +10,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 8 of 14</span>
+      <span class="tag">Step 8 of 15</span>
       <h2 id="st">Multiple features</h2>
       <p class="goal">Area alone cannot explain a price. Give the model four features, each with its own weight, and train all the weights together with the same gradient descent as step 6.</p>
 

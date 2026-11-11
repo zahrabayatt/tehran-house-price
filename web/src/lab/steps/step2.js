@@ -9,7 +9,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 2 of 14</span>
+      <span class="tag">Step 2 of 15</span>
       <h2 id="st">Cleaning</h2>
       <p class="goal">Some ads have impossible numbers. Drag the four limits to decide which ads the model may learn from.</p>
       <div class="split">
@@ -260,7 +260,9 @@ export function mount(ctx) {
       }
       g.style.cursor = isV ? 'ew-resize' : 'ns-resize';
       g.addEventListener('pointerdown', (e) => {
-        g.setPointerCapture(e.pointerId);
+        // Each move redraws the chart, which replaces this handle, so the drag is followed on
+        // the window rather than on the handle itself.
+        e.preventDefault();
         const mv = (ev) => {
           const pt = svg.createSVGPoint();
           pt.x = ev.clientX;
@@ -283,11 +285,13 @@ export function mount(ctx) {
           schedule();
         };
         const up = () => {
-          g.removeEventListener('pointermove', mv);
-          g.removeEventListener('pointerup', up);
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
         };
-        g.addEventListener('pointermove', mv);
-        g.addEventListener('pointerup', up);
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
       });
       g.addEventListener('keydown', (e) => {
         const up = ['ArrowUp', 'ArrowRight'].includes(e.key),

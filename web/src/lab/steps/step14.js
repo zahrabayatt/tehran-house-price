@@ -1,5 +1,5 @@
-// Model Lab, step 14. Ported from the approved design draft docs/design/HouseLabStep14.html:
-// the markup, then mount(), which runs the step's interactive code once its markup is on the page.
+// Model Lab, step 14: log price. Why version 2 of the model predicts the log of the price, with
+// the October comparison from training/compare_targets.py (lab-logprice.json).
 import katex from 'katex';
 
 export const html = `<div id="main" class="skel" aria-busy="true">
@@ -10,270 +10,217 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 14 of 14</span>
-      <h2 id="st">Held-out result</h2>
-      <p class="goal">The final check. The live model, everything from steps 1 to 13, is scored once on two months of ads it never saw and that played no part in any choice.</p>
+      <span class="tag">Step 14 of 15</span>
+      <h2 id="st">Log price</h2>
+      <p class="goal">Steps 4 to 13 judged the model by its miss in billions, squared. That makes a miss on an expensive flat count far more than the same share of miss on a cheap one. Measuring on the log of the price fixes that. It was the biggest improvement this project found.</p>
 
-      <div class="time" id="time" aria-label="How the months were used"></div>
+      <h3 class="h3b">The same two mistakes, measured two ways</h3>
+      <p class="small lead">Two flats, and the model is <b>20% too high on both</b>. One is a cheap flat of 4 billion. The other is yours: drag to set its price.</p>
+      <div class="player" role="group" aria-label="Your flat">
+        <div class="prow">
+          <label class="lam" for="price"><span>Your flat's asked price</span><span class="lw"><input id="price" type="range" min="1" max="40" step="0.5" value="20"></span><b id="pv">20.0 billion</b></label>
+        </div>
+      </div>
+
+      <figure class="rulers" aria-labelledby="rcap">
+        <div class="legend">
+          <span class="key"><i class="kc"></i>Cheap flat: <b id="lgC"></b></span>
+          <span class="key"><i class="kd"></i>Your flat: <b id="lgD"></b></span>
+          <span class="key"><i class="kb"></i>a bar runs from the asked price to the estimate</span>
+        </div>
+        <div class="rrow">
+          <div class="rhead"><b>Plain ruler</b><span>every billion is the same width. How version 1 measured a miss.</span></div>
+          <svg id="r1" viewBox="0 0 520 64" width="100%" role="img"></svg>
+          <div class="rval" id="rv1"></div>
+        </div>
+        <div class="rrow">
+          <div class="rhead"><b>Log ruler</b><span>every doubling is the same width. How version 2 measures a miss.</span></div>
+          <svg id="r2" viewBox="0 0 520 64" width="100%" role="img"></svg>
+          <div class="rval" id="rv2"></div>
+        </div>
+        <figcaption id="rcap" class="note">On the plain ruler the same 20% mistake looks bigger the dearer the flat. On the log ruler it is always the same length, because log(a) − log(b) = log(a ÷ b) depends only on the share. The model's cost squares these lengths, so the cards below show what each ruler charges.</figcaption>
+      </figure>
 
       <div class="three" id="three"></div>
       <p class="small" id="threeNote"></p>
     </section>
 
-    <section class="card" aria-labelledby="st2">
-      <h2 id="st2" class="h2b">Every held-out ad</h2>
-      <div class="two">
-        <figure class="plot">
-          <div class="phead"><b>Estimate against asked price</b></div>
-          <div class="pbox"><canvas id="dots" aria-hidden="true"></canvas><svg id="sc" viewBox="0 0 520 420" width="100%" role="img" aria-label="Each held-out ad: the model's estimate across, the asked price up"></svg></div>
-          <figcaption class="note">All <span id="nAll"></span> ads from November and December 2024. On the dashed line the estimate equals the asked price; the shaded band is within 25%. <span id="nOut"></span> ads above 50 billion are left off the chart. Click any dot to see that ad.</figcaption>
-        </figure>
-        <div class="side">
-          <div class="box adcard" id="adcard"></div>
-          <div class="box"><h3>How far off</h3>
-            <div class="bars" id="hist"></div>
-            <p class="small" id="histNote"></p></div>
-        </div>
-      </div>
+    <section class="card" aria-labelledby="st3">
+      <h2 id="st3" class="h2b">Three ways, judged on October</h2>
+      <p class="goal" id="cmpGoal"></p>
+      <div class="cmp" id="cmp"></div>
+      <h3 class="h3b">Typical miss by price, October</h3>
+      <div class="bars" id="quarters"></div>
+      <p class="small"><span class="key"><i class="kp"></i>Price (version 1)</span> <span class="key"><i class="kl"></i>Log price and log inputs (version 2)</span></p>
+      <p class="small" id="cmpNote"></p>
     </section>
 
-    <section class="card" aria-labelledby="st3">
-      <h2 id="st3" class="h2b">Checked against scikit-learn</h2>
-      <p class="goal">The same features, fitted by scikit-learn and scored on the same held-out ads.</p>
-      <div class="cmp" id="cmp"></div>
-      <div class="two" style="margin-top:16px">
-        <div class="box"><h3>Run it yourself</h3><pre class="cmd">python -m training.train</pre><p class="small">Downloads the ads, cleans them, trains, picks λ on October, then scores November and December once. Every number on this page comes from that run's saved model.</p></div>
-        <div class="box"><h3>Prices then and now</h3><p class="small">These are asking prices from November and December 2024. Tehran asking prices are about 3 times higher today, which is why the estimate page labels every price with its date.</p></div>
+    <section class="card" aria-labelledby="st4">
+      <h2 id="st4" class="h2b">What changed in the model</h2>
+      <div class="two">
+        <div class="box"><h3>The model now</h3><p class="small" id="model"></p></div>
+        <div class="box"><h3>Still linear regression</h3><p class="small">w · x + b is the same weighted sum, trained by the same gradient descent on the same cost formula from step 4. Only the number it predicts, and two of its inputs, are logs. exp turns the answer back into billions of toman, and exp is always above zero, so no estimate can be zero or negative.</p></div>
       </div>
     </section>
     </div>
   </div>`;
 
-export const mathHtml = `<div class="mrow" tabindex="0"><span id="m1"></span><p>The step 4 cost on the held-out ads. No λ term: the penalty is for training, not for judging.</p></div>
-        <div class="mrow" tabindex="0"><span id="m2"></span><p>The gap people understand: how far each estimate is from the asked price. Half the ads are closer than the median.</p></div>`;
+export const mathHtml = `<div class="mrow" tabindex="0"><span id="m1"></span><p>The step 4 cost with one change: the model is compared with the log of each asked price.</p></div>
+        <div class="mrow" tabindex="0"><span id="m2"></span><p>Why that helps: a gap between two logs depends only on the ratio of the prices, so the same share of miss costs the same for every flat.</p></div>
+        <div class="mrow" tabindex="0"><span id="m3"></span><p>The estimate in billions: exp undoes the log.</p></div>`;
 
-export const skHtml = `<pre>from sklearn.linear_model import Ridge</pre><p>The same penalized linear regression (step 13).</p>
-        <pre>model = Ridge(alpha=100).fit(X_train, y_train)</pre><p>λ = 100, the value October picked.</p>
-        <pre>err = model.predict(X_held) - y_held</pre><p>Misses on the same held-out ads.</p>
-        <pre>j_held = (err ** 2).mean() / 2</pre><p>The same cost. This project splits by month rather than with train_test_split, because prices rise over time and a random split would let the model peek at later prices.</p>`;
+export const skHtml = `<pre>from sklearn.compose import TransformedTargetRegressor</pre><p>Wraps a regressor so it learns a changed target.</p>
+        <pre>model = TransformedTargetRegressor(
+    LinearRegression(), func=np.log, inverse_func=np.exp)</pre><p>Trains on log(y) and answers with exp, as this project does by hand.</p>
+        <pre>model.fit(X_train, y_train)</pre><p>X holds log(area), log(location) and the other features, scaled as in step 10.</p>
+        <pre>estimate = model.predict(X_new)</pre><p>Already back in billions of toman.</p>`;
+
+const MISS = 1.2; // every estimate in the first card is 20% too high
+const REF = 4; // the cheap flat the dearer ones are compared with
 
 /** Runs the step. `ctx.load(name)` gives its data; the returned function stops everything it started. */
 export function mount(ctx) {
-  const { setTimeout, requestAnimationFrame, cancelAnimationFrame, win, dispose } = ctx.scope();
+  const { setTimeout, dispose } = ctx.scope();
+  const ns = 'http://www.w3.org/2000/svg';
+  const pct = (v) => `${(v * 100).toFixed(1)}%`;
+  const input = document.getElementById('price');
 
-  const ns = 'http://www.w3.org/2000/svg',
-    svg = document.getElementById('sc'),
-    cv = document.getElementById('dots');
-  const L = 56,
-    R = 505,
-    T = 14,
-    B = 356,
-    PM = 50;
-  let D = null,
-    sel = -1;
-  const fx = (v) => L + (Math.min(v, PM) / PM) * (R - L),
-    fy = (v) => B - (Math.min(v, PM) / PM) * (B - T),
-    num = (v) => v.toLocaleString('en-US');
   function el(par, t, a, txt) {
     const e = document.createElementNS(ns, t);
-    for (const kk in a) e.setAttribute(kk, a[kk]);
+    for (const k in a) e.setAttribute(k, a[k]);
     if (txt !== undefined) e.textContent = txt;
     par.appendChild(e);
     return e;
   }
-  function drawTop() {
-    const r = D.rowsN,
-      c = D.cost;
-    document.getElementById('time').innerHTML =
-      `<div style="background:var(--acs)"><b>May to September 2024</b><span>${num(r.train)} ads train the weights</span></div><div style="background:rgba(47,111,219,.16)"><b>October</b><span>${num(r.selection)} ads pick λ</span></div><div style="background:rgba(138,79,209,.18)"><b>November and December</b><span>${num(r.held_out)} ads, the final check</span></div>`;
+
+  function drawMiss() {
+    const p = Number(input.value);
+    const miss = p * (MISS - 1);
+    const billions = miss ** 2 / 2;
+    const logCost = Math.log(MISS) ** 2 / 2;
+    const refCost = (REF * (MISS - 1)) ** 2 / 2;
+    document.getElementById('pv').textContent = `${p.toFixed(1)} billion`;
+    drawRulers(p);
     document.getElementById('three').innerHTML = [
-      ['Cost on the training ads', c.train, 'what it learned from', 'var(--ac)'],
-      ['Cost on October', c.selection, 'used to pick λ', 'var(--cs)'],
-      ['Cost on November and December', c.held_out, 'never seen, never used', 'var(--ch)'],
+      ["Your flat's miss", miss.toFixed(2), 'billion toman, 20% of its price', 'var(--cd)'],
+      ['Its cost on the plain ruler', billions.toFixed(2), '(bar length)² ÷ 2: grows with the price', 'var(--cp)'],
+      ['Its cost on the log ruler', logCost.toFixed(4), '(bar length)² ÷ 2: the same for every flat', 'var(--cl)'],
     ]
       .map(
-        ([t, v, s, col]) =>
-          `<div class="num" style="--c:${col}"><span>${t}</span><b>${v.toFixed(2)}</b><small>${s}</small></div>`,
+        ([t, v, s, c]) =>
+          `<div class="num" style="--c:${c}"><span>${t}</span><b>${v}</b><small>${s}</small></div>`,
       )
       .join('');
+    const times = billions / refCost;
     document.getElementById('threeNote').innerHTML =
-      `On months it never saw, the cost rises only from <b>${c.train.toFixed(2)}</b> to <b>${c.held_out.toFixed(2)}</b>. A model that had memorized its training ads would jump far higher (step 12). Prices also edged up after training: the median price per m² was 83.8 million toman in September and 88.0 million in December, which makes later months a little harder.`;
+      p === REF
+        ? `Both flats are now the same. Drag the price up: on the plain ruler your flat's cost grows with the square of its price, while on the log ruler it never changes.`
+        : `Your flat's miss costs <b>${times.toFixed(times < 10 ? 1 : 0)} times as much</b> as the cheap flat's on the plain ruler, and <b>exactly the same</b> on the log ruler. Gradient descent fixes whatever costs most, so on the plain ruler it works for the dear flats and lets cheap ones miss by a larger share.`;
   }
-  function fitCanvas() {
-    const r = svg.getBoundingClientRect(),
-      dpr = window.devicePixelRatio || 1,
-      s = r.width / 520;
-    cv.style.width = r.width + 'px';
-    cv.style.height = r.height + 'px';
-    cv.width = Math.round(r.width * dpr);
-    cv.height = Math.round(r.height * dpr);
-    const c = cv.getContext('2d');
-    c.setTransform(dpr * s, 0, 0, dpr * s, 0, 0);
-    c.clearRect(0, 0, 520, 420);
-    return c;
-  }
-  function drawScatter() {
-    const c = fitCanvas();
-    c.fillStyle = getComputedStyle(document.getElementById('main')).getPropertyValue('--ch').trim();
-    c.globalAlpha = 0.12;
-    for (const r of D.rows) {
-      if (r[0] > PM || r[1] > PM) continue;
-      c.beginPath();
-      c.arc(fx(r[0]), fy(r[1]), 1.9, 0, 6.283);
-      c.fill();
-    }
+
+  // Two rulers, each with the cheap flat's mistake and yours drawn as bars from the asked
+  // price to the estimate. Lanes keep the two bars apart when the prices are close.
+  const L = 14,
+    R = 506,
+    AXIS = 40;
+  const RULERS = {
+    r1: { at: (v) => L + (v / 50) * (R - L), ticks: [0, 10, 20, 30, 40, 50] },
+    r2: { at: (v) => L + (Math.log2(v) / 6) * (R - L), ticks: [1, 2, 4, 8, 16, 32, 64] },
+  };
+
+  function drawRuler(id, flats) {
+    const { at, ticks } = RULERS[id];
+    const svg = document.getElementById(id);
     svg.innerHTML = '';
-    el(svg, 'path', {
-      d: `M${fx(0)} ${fy(0)}L${fx(PM / 1.25)} ${fy(PM)}L${fx(PM)} ${fy(PM)}L${fx(PM)} ${fy(PM * 0.75)}Z`,
-      fill: 'var(--ac)',
-      opacity: 0.1,
-    });
-    [0, 10, 20, 30, 40, 50].forEach((v) => {
-      el(svg, 'line', { x1: L, x2: R, y1: fy(v), y2: fy(v), stroke: 'var(--rule)' });
-      el(svg, 'text', { x: L - 8, y: fy(v) + 4, 'text-anchor': 'end', 'font-size': 12, fill: 'var(--mut)' }, v);
-      el(svg, 'text', { x: fx(v), y: B + 18, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--mut)' }, v);
-    });
-    el(svg, 'line', {
-      x1: fx(0),
-      y1: fy(0),
-      x2: fx(PM),
-      y2: fy(PM),
-      stroke: 'var(--ink)',
-      'stroke-dasharray': '5 4',
-      'stroke-width': 1.5,
-    });
-    el(
-      svg,
-      'text',
-      { x: (L + R) / 2, y: B + 40, 'text-anchor': 'middle', 'font-size': 13, fill: 'var(--mut)' },
-      'Model estimate (billion toman)',
-    );
-    el(
-      svg,
-      'text',
-      {
-        x: 14,
-        y: (T + B) / 2,
-        'text-anchor': 'middle',
-        'font-size': 13,
-        fill: 'var(--mut)',
-        transform: 'rotate(-90 14 ' + (T + B) / 2 + ')',
-      },
-      'Asked price (billion toman)',
-    );
-    const hit = el(svg, 'rect', {
-      x: L,
-      y: T,
-      width: R - L,
-      height: B - T,
-      fill: 'transparent',
-      style: 'cursor:crosshair',
-    });
-    hit.addEventListener('click', (e) => {
-      const p = svg.createSVGPoint();
-      p.x = e.clientX;
-      p.y = e.clientY;
-      const q = p.matrixTransform(svg.getScreenCTM().inverse());
-      let bi = 0,
-        bd = 1e9;
-      D.rows.forEach((r, i) => {
-        if (r[0] > PM || r[1] > PM) return;
-        const d = (fx(r[0]) - q.x) ** 2 + (fy(r[1]) - q.y) ** 2;
-        if (d < bd) {
-          bd = d;
-          bi = i;
-        }
-      });
-      sel = bi;
-      drawScatter();
-      drawAd();
-    });
-    if (sel >= 0) {
-      const r = D.rows[sel];
-      el(svg, 'circle', { cx: fx(r[0]), cy: fy(r[1]), r: 8, fill: 'none', stroke: 'var(--warn)', 'stroke-width': 3 });
-      el(svg, 'circle', { cx: fx(r[0]), cy: fy(r[1]), r: 3, fill: 'var(--warn)' });
+    el(svg, 'line', { x1: L, x2: R, y1: AXIS, y2: AXIS, stroke: 'var(--ink)', 'stroke-width': 1.5 });
+    for (const v of ticks) {
+      el(svg, 'line', { x1: at(v), x2: at(v), y1: AXIS - 5, y2: AXIS + 5, stroke: 'var(--ink)', 'stroke-width': 1.5 });
+      const anchor = v === ticks[0] ? 'start' : v === ticks[ticks.length - 1] ? 'end' : 'middle';
+      el(svg, 'text', { x: at(v), y: AXIS + 21, 'text-anchor': anchor, 'font-size': 15, fill: 'var(--mut)' }, v);
     }
+    flats.forEach(([price, colour], lane) => {
+      const x1 = at(price),
+        x2 = at(price * MISS),
+        y = 8 + lane * 12;
+      el(svg, 'line', { x1, x2: x1, y1: y, y2: AXIS, stroke: colour, 'stroke-width': 1, 'stroke-dasharray': '2 2' });
+      el(svg, 'rect', { x: x1, y, width: Math.max(2, x2 - x1), height: 8, fill: colour, rx: 2 });
+    });
   }
-  function drawAd() {
-    const r = D.rows[sel],
-      off = r[0] - r[1],
-      sh = (Math.abs(off) / r[1]) * 100,
-      h = r[4] >= 0 ? D.hoods[r[4]] : 'Neighborhood not given';
-    document.getElementById('adcard').innerHTML =
-      `<h3>${h}</h3><div class="adrow"><span>Area</span><b>${r[2]} m²</b><span>Bedrooms</span><b>${r[3]}</b><span>Model estimate</span><b>${r[0].toFixed(2)} billion</b><span>Asked</span><b>${r[1].toFixed(2)} billion</b><span>Off by</span><b class="off">${off >= 0 ? '+' : '−'}${Math.abs(off).toFixed(2)} (${sh.toFixed(0)}%)</b></div>`;
+
+  function drawRulers(p) {
+    const fmt = (v) => `${v.toFixed(1)} → ${(v * MISS).toFixed(1)} billion`;
+    document.getElementById('lgC').textContent = fmt(REF);
+    document.getElementById('lgD').textContent = fmt(p);
+    const flats = [
+      [REF, 'var(--cc)'],
+      [p, 'var(--cd)'],
+    ];
+    drawRuler('r1', flats);
+    drawRuler('r2', flats);
+    const cheap = REF * (MISS - 1),
+      yours = p * (MISS - 1),
+      ratio = yours / cheap,
+      logLen = Math.log(MISS);
+    document.getElementById('r1').setAttribute(
+      'aria-label',
+      `Plain ruler, 0 to 50 billion. The cheap flat's bar is ${cheap.toFixed(2)} billion long, yours is ${yours.toFixed(2)}.`,
+    );
+    document.getElementById('r2').setAttribute(
+      'aria-label',
+      `Log ruler, 1 to 64 billion. Both bars are ${logLen.toFixed(3)} long.`,
+    );
+    document.getElementById('rv1').innerHTML =
+      `<span>bar lengths</span><b>${cheap.toFixed(2)} and ${yours.toFixed(2)}</b><span>${p === REF ? 'the same' : `yours is ${ratio.toFixed(1)} times as long`}</span>`;
+    document.getElementById('rv2').innerHTML =
+      `<span>bar lengths</span><b>${logLen.toFixed(3)} and ${logLen.toFixed(3)}</b><span>the same, at any price</span>`;
   }
-  function drawHist() {
-    const sh = D.rows.map((r) => Math.abs(r[0] - r[1]) / r[1]),
-      n = sh.length,
-      edges = [0, 0.1, 0.2, 0.3, 0.5, 1, Infinity],
-      labs = ['under 10%', '10 to 20%', '20 to 30%', '30 to 50%', '50 to 100%', 'over 100%'];
-    const cnt = labs.map((_, i) => sh.filter((v) => v >= edges[i] && v < edges[i + 1]).length),
-      mx = Math.max(...cnt);
-    document.getElementById('hist').innerHTML = labs
+
+  function drawCompare(d) {
+    const by = Object.fromEntries(d.approaches.map((a) => [a.key, a]));
+    const best = d.approaches.reduce((a, b) => (b.median_share_of_price < a.median_share_of_price ? b : a));
+    document.getElementById('cmpGoal').textContent =
+      `Each way trained the same ${d.candidates} versions on May to September and kept its own best on October. ` +
+      `Then the three winners were compared on October's ${d.ads.toLocaleString('en-US')} ads. November and December were not used.`;
+    document.getElementById('cmp').innerHTML = d.approaches
       .map(
-        (l, i) =>
-          `<div class="hb${i >= 4 ? ' far' : ''}"><span>${l}</span><span class="tr"><i style="width:${(cnt[i] / mx) * 100}%"></i></span><b>${Math.round((cnt[i] / n) * 100)}%</b></div>`,
+        (a) =>
+          `<div class="cm${a === best ? ' win' : ''}"><span>${a.label}${a.key === 'price' ? ' (version 1)' : ''}${a === best ? ' (version 2)' : ''}</span><b>${pct(a.median_share_of_price)}</b><small>typical miss. One in ten off by more than ${pct(a.p90_share_of_price)}. Cost in billions ${a.cost_billions.toFixed(2)}.</small></div>`,
       )
       .join('');
-    const g = D.gap;
-    document.getElementById('histNote').innerHTML =
-      `Half of the estimates are within <b>${g.median_billions.toFixed(2)} billion</b> (${(g.median_share_of_price * 100).toFixed(0)}% of the price) of the asked price. Nine in ten are within ${g.p90_billions.toFixed(2)} billion (${(g.p90_share_of_price * 100).toFixed(0)}%). The model only knows area, bedrooms, age, parking, elevator, storage and the neighborhood's usual price, so it cannot see a flat's view, floor or renovation; some misses come from that.`;
-  }
-  function drawCmp() {
-    const c = D.cost.held_out,
-      s = D.sklearn;
-    document.getElementById('cmp').innerHTML = [
-      ['This project, from scratch', c, 'NumPy gradient descent, λ = 100, 5,000 steps'],
-      [
-        'scikit-learn Ridge',
-        s.ridge,
-        'same features, same λ: ' +
-          (Math.abs(s.ridge - c) < 0.001 ? 'the same result' : 'within ' + Math.abs(s.ridge - c).toFixed(3)),
-      ],
-      [
-        'scikit-learn LinearRegression',
-        s.linear_regression,
-        'no penalty: ' + (s.linear_regression < c ? 'slightly lower' : 'slightly higher') + ' on these months',
-      ],
-    ]
-      .map(([t, v, x]) => `<div class="cm"><span>${t}</span><b>${v.toFixed(3)}</b><small>${x}</small></div>`)
+    const p = by.price,
+      l = by.log_both;
+    const mx = Math.max(...p.quarters.map((q) => q.median_share), ...l.quarters.map((q) => q.median_share));
+    const row = (cls, label, v) =>
+      `<div class="hb ${cls}"><span>${label}</span><span class="tr"><i style="width:${(v / mx) * 100}%"></i></span><b>${pct(v)}</b></div>`;
+    document.getElementById('quarters').innerHTML = p.quarters
+      .map((q, i) => {
+        const name = `${q.from.toFixed(1)} to ${q.to.toFixed(1)}`;
+        return `<div class="qg"><p class="ql">${['Cheapest quarter', 'Second quarter', 'Third quarter', 'Dearest quarter'][i]}: ${name} billion</p>${row('p', 'price', q.median_share)}${row('l', 'log', l.quarters[i].median_share)}</div>`;
+      })
       .join('');
+    const b = by.log_price;
+    document.getElementById('cmpNote').innerHTML =
+      `Taking the log of the price alone made things worse (${pct(b.median_share_of_price)}): a straight line cannot connect plain area to log price, because on the log scale price bends. ` +
+      `Taking the log of area and location as well puts both sides on the same ruler, where the relationship really is straight: log(price) is close to log(area) + log(price per m²). ` +
+      `The gain is biggest on cheap flats; the dearest quarter loses a little.`;
+    document.getElementById('model').innerHTML =
+      `f(x) = exp(w · x + b), with <b>${l.features.join(', ')}</b> and λ = ${l.lambda}.`;
   }
+
   const K = (s, id) => katex.render(s, document.getElementById(id), { throwOnError: false, displayMode: true });
-  K('J_{\\text{held-out}} = \\frac{1}{2m_h}\\sum_{i=1}^{m_h}\\big(f(\\mathbf{x}^{(i)})-y^{(i)}\\big)^2', 'm1');
-  K(
-    '\\text{gap}^{(i)} = \\big|f(\\mathbf{x}^{(i)})-y^{(i)}\\big|, \\qquad \\text{median gap} = 1.10\\text{ billion}',
-    'm2',
-  );
+  K('J(\\mathbf{w},b) = \\frac{1}{2m}\\sum_{i=1}^{m}\\big(\\mathbf{w}\\cdot\\mathbf{x}^{(i)}+b-\\ln y^{(i)}\\big)^2', 'm1');
+  K('\\ln a - \\ln b = \\ln\\frac{a}{b}', 'm2');
+  K('f(\\mathbf{x}) = e^{\\,\\mathbf{w}\\cdot\\mathbf{x}+b}', 'm3');
+
+  input.addEventListener('input', drawMiss);
   const main = document.getElementById('main');
-  ctx.load('house-heldout.json').then((d) => {
-    D = d;
-    document.getElementById('nAll').textContent = num(D.rows.length);
-    document.getElementById('nOut').textContent = num(D.rows.filter((r) => r[0] > PM || r[1] > PM).length);
-    // start on a typical ad: the one whose gap is closest to the median
-    const med = D.gap.median_billions;
-    let bi = 0,
-      bd = 1e9;
-    D.rows.forEach((r, i) => {
-      const g = Math.abs(Math.abs(r[0] - r[1]) - med) + (r[4] < 0 ? 9 : 0) + (r[1] > 30 ? 9 : 0);
-      if (g < bd) {
-        bd = g;
-        bi = i;
-      }
-    });
-    sel = bi;
+  ctx.load('house-logprice.json').then((d) => {
     setTimeout(() => {
       main.classList.remove('skel');
       main.setAttribute('aria-busy', 'false');
-      drawTop();
-      drawScatter();
-      drawAd();
-      drawHist();
-      drawCmp();
+      drawMiss();
+      drawCompare(d);
     }, 300);
-  });
-  win.addEventListener('resize', () => {
-    if (D) drawScatter();
   });
 
   return dispose;

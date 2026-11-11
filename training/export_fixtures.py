@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from training.features import build_matrix, zscore_apply  # noqa: E402
 from training.prep import LATEST_YEAR  # noqa: E402
 from training.train import MODEL_PATH, predict_from_model  # noqa: E402
 
@@ -36,7 +35,7 @@ EDGE_INPUTS = [
      "parking": 1, "elevator": 1, "storage": 1},
     {"area": 120.5, "neighborhood": "", "rooms": 3, "year": 1395,
      "parking": 1, "elevator": 0, "storage": 1},
-    # The model goes negative here (about -3.5 billion): the "too small" case.
+    # Small, old and in a cheap neighborhood: the smallest estimates the model gives.
     {"area": 25.0, "neighborhood": "sharifabad", "rooms": 1, "year": 1370,
      "parking": 1, "elevator": 1, "storage": 0},
 ]
@@ -76,19 +75,8 @@ def build_fixtures(model: dict) -> dict:
     inputs = EDGE_INPUTS + random_inputs(model)
     df = to_frame(inputs)
     totals = predict_from_model(model, df)
-    # Per-feature contribution in billions: z-score times weight, no bias.
-    X = build_matrix(df, model["location"]["lookup"], model["location"]["fallback"],
-                     model["features"])
-    Z = zscore_apply(X, np.array(model["scaling"]["mu"]), np.array(model["scaling"]["sigma"]))
-    parts = Z * np.array(model["weights"])
-    cases = []
-    for inp, total, row in zip(inputs, totals, parts):
-        cases.append({
-            "input": inp,
-            "expected": float(total),
-            "featureContributions": dict(zip(model["features"], map(float, row))),
-        })
-    return {"modelBias": model["bias"], "features": model["features"], "cases": cases}
+    cases = [{"input": inp, "expected": float(total)} for inp, total in zip(inputs, totals)]
+    return {"target": model["target"], "features": model["features"], "cases": cases}
 
 
 def main() -> None:

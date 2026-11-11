@@ -15,7 +15,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 1 of 14</span>
+      <span class="tag">Step 1 of 15</span>
       <h2 id="st">Data and notation</h2>
       <p class="goal">Each ad is one training example. Pick one to see how the model names it.</p>
       <div class="split">

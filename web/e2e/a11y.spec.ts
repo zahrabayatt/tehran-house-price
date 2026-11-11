@@ -51,7 +51,7 @@ for (const theme of THEMES) {
       test.setTimeout(300_000);
       await page.setViewportSize({ width, height: 900 });
       const problems: string[] = [];
-      for (let step = 1; step <= 14; step++) {
+      for (let step = 1; step <= 15; step++) {
         await open(page, `#/lab/${step}`, 'Model Lab', theme);
         const tabs = await page.getByRole('tab').allInnerTexts();
         for (const tab of tabs) {

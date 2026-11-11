@@ -10,7 +10,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 11 of 14</span>
+      <span class="tag">Step 11 of 15</span>
       <h2 id="st">Feature engineering</h2>
       <p class="goal">The model can only learn from the features you give it. Here is the feature that made this model good, built from what everyone in Tehran already knows: where a flat is matters as much as how big it is.</p>
 
@@ -22,7 +22,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
         <div class="box"><h3>Build a location feature</h3>
           <p class="zf">location = area × the neighborhood's usual price per m²</p>
           <p class="small">The usual price is the median price per m² of that neighborhood's training ads. <span id="hoodsN"></span> neighborhoods have at least 30 ads; any other ad uses the Tehran median, <span id="fb"></span> million toman per m².</p>
-          <p class="small"><b>Only training ads.</b> The medians never look at the months the model is tested on, so the test stays fair (step 14).</p></div>
+          <p class="small"><b>Only training ads.</b> The medians never look at the months the model is tested on, so the test stays fair (step 15).</p></div>
         <div class="box"><h3>For the three flats</h3><table class="zt" id="locT"></table></div>
       </div>
 
@@ -38,7 +38,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
       <h2 id="st2" class="h2b">Which features earn their place</h2>
       <p class="goal">The best training cost for each set of features the real training run tried. Lower is better.</p>
       <div class="ladder" id="ladder"></div>
-      <p class="small">Squaring a feature lets a straight-line model bend: f is still w · x + b, only some x are squares. Adding features always lowers the training cost, so the real test is on months the model has never seen: steps 12 to 14.</p>
+      <p class="small">Squaring a feature lets a straight-line model bend: f is still w · x + b, only some x are squares. Adding features always lowers the training cost, so the real test is on months the model has never seen: steps 12 to 15.</p>
     </section>
     </div>
   </div>`;

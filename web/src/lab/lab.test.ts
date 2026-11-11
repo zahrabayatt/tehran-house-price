@@ -10,8 +10,8 @@ import type { TrainFile } from './data';
 const train = JSON.parse(readFileSync(resolve(__dirname, '../../public/data/lab-train.json'), 'utf8')) as TrainFile;
 
 describe('the Lab steps', () => {
-  it('has fourteen steps in order, in three sections', () => {
-    expect(STEPS.map((s) => s.n)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+  it('has fifteen steps in order, in three sections', () => {
+    expect(STEPS.map((s) => s.n)).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
     expect(new Set(STEPS.map((s) => s.section))).toEqual(new Set(['One feature', 'Many features', 'Fitting well']));
   });
 
@@ -67,5 +67,17 @@ describe('the Lab data', () => {
     s.dispose();
     await new Promise((r) => setTimeout(r, 10));
     expect(ran).toBe(false);
+  });
+});
+
+describe('Lab colours', () => {
+  it('every colour a step uses is defined somewhere', () => {
+    const read = (p: string) => readFileSync(resolve(__dirname, p), 'utf8');
+    const steps = STEPS.map((s) => read(`steps/step${s.n}.js`)).join('\n') + read('bowl.js');
+    const css = read('lab-steps.css') + read('../pages/lab.css') + read('../theme/tokens.css');
+    const used = new Set([...(steps + css).matchAll(/var\(--([a-z0-9-]+)\)/g)].map((m) => m[1]));
+    // --c is set inline by the step itself (style="--c:...")
+    const defined = new Set([...css.matchAll(/--([a-z0-9-]+)\s*:/g), ...steps.matchAll(/--([a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+    expect([...used].filter((v) => !defined.has(v))).toEqual([]);
   });
 });

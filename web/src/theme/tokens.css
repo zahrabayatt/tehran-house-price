@@ -9,6 +9,8 @@
   --acs: #DDF2E8;
   --warn: #A8480A;
   --on: #FFFFFF;
+  /* the model's line in the Lab charts, as in the drafts */
+  --line: #101512;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -21,6 +23,7 @@
   --acs: #26453A;
   --warn: #F2A766;
   --on: #0E1F18;
+  --line: #FFFFFF;
   color-scheme: dark;
 }
 

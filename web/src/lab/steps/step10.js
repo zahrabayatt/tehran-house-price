@@ -10,7 +10,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 10 of 14</span>
+      <span class="tag">Step 10 of 15</span>
       <h2 id="st">Feature scaling</h2>
       <p class="goal">Area runs into the hundreds while parking is 0 or 1, so in step 8 one learning rate could not suit them all. Put every feature on the same scale first, and training gets thousands of times faster.</p>
 

@@ -2,6 +2,25 @@
 
 All notable changes to this project. Dates are real dates.
 
+## 2.1.0 - 2026-11-09
+
+The model learns the log of the price (model version 2). Plan: `docs/improvements/house-log-price-plan.md` in the planning folder.
+
+### Changed
+
+- Training: the target is log(price), area and location enter as logs, and an estimate is exp of the model's output. The same 100 candidates, chosen on October. Held-out typical miss 12.1% (was 15.6%); one in ten off by more than 40.1% (was 58.5%). Estimates can no longer be zero or negative.
+- Data card and Data page: version 1's results are kept for comparison, and the version 2 held-out numbers are labelled as a second look at months version 1 had already used.
+- Model Lab: a new step 14, Log price, with the October comparison of three targets. The held-out result is now step 15 and compares with version 1.
+
+### Added
+
+- `training/compare_targets.py`: the October comparison of price, log price, and log price with log inputs, written to `web/public/data/lab-logprice.json`.
+- Feature names can carry a log: `log(area)`, `log(area)^2`.
+
+### Removed
+
+- The unused per-feature price breakdown in the web predictor; it does not add up in billions on the log scale.
+
 ## 2.0.0 - 2026-11-07
 
 A redesign after a page-by-page review (`docs/improvements/house-price-improvements.md` in the planning folder).

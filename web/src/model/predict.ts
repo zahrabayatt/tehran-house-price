@@ -1,5 +1,5 @@
 import type {
-  ApartmentInput, Contribution, Estimate, InputWarning, Model, RawInput, Validated,
+  ApartmentInput, Estimate, InputWarning, Model, RawInput, Validated,
 } from './types';
 
 export const LATEST_YEAR = 1403;
@@ -15,17 +15,6 @@ export const ROOMS_DEFAULT = 2;
 export const LOW_DATA_AREA = 200;
 /** Totals below this (billions of toman) are flagged as outside the model's range. */
 export const TOO_SMALL_TOTAL = 0.5;
-
-const SIZE_LABEL = 'Size and neighborhood';
-const LABELS: Record<string, string> = {
-  area: SIZE_LABEL,
-  location: SIZE_LABEL,
-  rooms: 'Bedrooms',
-  age: 'Building age',
-  parking: 'Parking',
-  elevator: 'Elevator',
-  storage: 'Storage',
-};
 
 function toNumber(v: unknown): number {
   if (typeof v === 'number') return v;
@@ -136,41 +125,31 @@ function baseValue(base: string, input: ApartmentInput, ppm2: number): number {
   }
 }
 
-/** Raw value of a feature such as "area" or "location^2", before scaling. */
+const NAME = /^(?:log\((\w+)\)|(\w+))(?:\^(\d+))?$/;
+
+/**
+ * Raw value of a feature before scaling. A name is a base feature, optionally inside
+ * log(...), optionally raised to a power: "rooms", "location^2", "log(area)^2".
+ * The log comes first, then the power, as in training/features.py.
+ */
 export function featureValue(name: string, input: ApartmentInput, ppm2: number): number {
-  const [base, power] = name.split('^');
-  const x = baseValue(base, input, ppm2);
-  return power === undefined ? x : x ** Number(power);
+  const m = NAME.exec(name);
+  if (!m) throw new Error(`Unknown feature "${name}" in model`);
+  const logged = m[1] !== undefined;
+  let x = baseValue(logged ? m[1] : m[2], input, ppm2);
+  if (logged) x = Math.log(x);
+  return m[3] === undefined ? x : x ** Number(m[3]);
 }
 
-/** Estimate an asking price, in billions of toman, with a breakdown from the average apartment. */
+/** Estimate an asking price, in billions of toman. */
 export function predict(model: Model, input: ApartmentInput): Estimate {
   const { ppm2, used } = lookupPrice(model, input.neighborhood);
-  const rows: Contribution[] = [];
-  const index = new Map<string, number>();
-  let total = model.bias;
-
+  let sum = model.bias;
   model.features.forEach((name, j) => {
     const sigma = model.scaling.sigma[j] > 0 ? model.scaling.sigma[j] : 1;
-    const z = (featureValue(name, input, ppm2) - model.scaling.mu[j]) / sigma;
-    const part = z * model.weights[j];
-    total += part;
-
-    const label = LABELS[name.split('^')[0]] ?? name;
-    const at = index.get(label);
-    if (at === undefined) {
-      index.set(label, rows.length);
-      rows.push({ label, value: part });
-    } else {
-      rows[at].value += part;
-    }
+    sum += ((featureValue(name, input, ppm2) - model.scaling.mu[j]) / sigma) * model.weights[j];
   });
-
-  return {
-    total,
-    baseline: model.bias,
-    contributions: rows,
-    tooSmall: total < TOO_SMALL_TOTAL,
-    usedFallback: used,
-  };
+  // Version 2 learns the log of the price, so the weighted sum is turned back with exp.
+  const total = model.target === 'log_price' ? Math.exp(sum) : sum;
+  return { total, tooSmall: total < TOO_SMALL_TOTAL, usedFallback: used };
 }

@@ -11,7 +11,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 6 of 14</span>
+      <span class="tag">Step 6 of 15</span>
       <h2 id="st">Gradient descent</h2>
       <p class="goal">Take a small step downhill, recompute the slope, repeat. Drag the start on the bowl, choose a step size, and press Start: the line, the path and the cost all move together.</p>
 

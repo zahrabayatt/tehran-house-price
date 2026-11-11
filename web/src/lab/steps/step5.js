@@ -11,7 +11,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 5 of 14</span>
+      <span class="tag">Step 5 of 15</span>
       <h2 id="st">Gradient</h2>
       <p class="goal">The gradient is the slope of the cost bowl where your line is. It says which way is downhill for w and for b, and how steep it is. Drag the dot in any chart.</p>
       <div class="two">

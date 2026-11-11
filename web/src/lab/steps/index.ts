@@ -52,8 +52,9 @@ export const STEPS: StepInfo[] = [
     n: 13, title: 'Regularization', section: 'Fitting well',
     code: () => [lab('compute_cost_reg'), lab('compute_gradient_reg')], load: () => import('./step13.js'),
   },
+  { n: 14, title: 'Log price', section: 'Fitting well', code: () => [lab('log_price')], load: () => import('./step14.js') },
   {
-    n: 14, title: 'Held-out result', section: 'Fitting well',
-    code: () => [lab('split_by_month'), lab('evaluate_held_out')], load: () => import('./step14.js'),
+    n: 15, title: 'Held-out result', section: 'Fitting well',
+    code: () => [lab('split_by_month'), lab('evaluate_held_out')], load: () => import('./step15.js'),
   },
 ];

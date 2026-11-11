@@ -21,7 +21,7 @@ FORBIDDEN = {"lat", "lon", "latitude", "longitude", "location_latitude",
 MODEL_KEYS = {"version", "features", "weights", "bias", "scaling", "location",
               "hyperparameters", "cost", "sklearn_cost", "cost_history", "rows",
               "date_range", "unit", "trained_at", "runtime_ms", "environment",
-              "candidates", "held_out_gap"}
+              "candidates", "held_out_gap", "target", "cost_billions", "previous_version"}
 MONTHS = [f"2024-{m:02d}" for m in range(5, 13)]
 SMALL = [(("location",), 0.0), (("location", "age"), 0.0),
          (("location", "age"), 100.0), (("area",), 0.0)]
@@ -149,8 +149,24 @@ def test_selection_cost_has_no_penalty():
     records, _, _, _ = T.select_candidate(train, sel, [(("location",), 100.0)], 0.3, 300)
     fit = T.fit_candidate(train, ("location",), 100.0, 0.3, 300)
     pred = T.predict_fit(fit, sel)
-    plain = float(np.mean((pred - sel["price"].to_numpy()) ** 2) / 2)
+    plain = float(np.mean((np.log(pred) - np.log(sel["price"].to_numpy())) ** 2) / 2)
     assert records[0]["selection_cost"] == pytest.approx(plain)
+
+
+def test_the_model_learns_log_price_and_predicts_in_billions():
+    df = synthetic()
+    train, sel, _ = split_by_month(df)
+    fit = T.fit_candidate(train, ("log(location)", "age"), 0.0, 0.3, 3000)
+    pred = T.predict_fit(fit, sel)
+    assert (pred > 0).all()
+    # The synthetic price is area * ppm2 / 1000, so log(location) explains it almost exactly.
+    share = np.abs(pred - sel["price"].to_numpy()) / sel["price"].to_numpy()
+    assert np.median(share) < 0.06
+    assert np.allclose(np.log(pred), T.predict_log(fit, sel))
+
+
+def test_cost_in_billions_is_the_version_1_cost():
+    assert T.cost_in_billions([1.0, 3.0], [2.0, 1.0]) == pytest.approx((1 + 4) / 4)
 
 
 def test_diverged_candidate_cannot_win():
@@ -220,8 +236,9 @@ def test_predict_from_model_is_self_contained():
     m = res["model"]
     _, _, held = split_by_month(synthetic())
     pred = T.predict_from_model(m, held)
-    cost = float(np.mean((pred - held["price"].to_numpy()) ** 2) / 2)
-    assert cost == pytest.approx(m["cost"]["held_out"])
+    y = held["price"].to_numpy()
+    assert float(np.mean((pred - y) ** 2) / 2) == pytest.approx(m["cost_billions"]["held_out"])
+    assert float(np.mean((np.log(pred) - np.log(y)) ** 2) / 2) == pytest.approx(m["cost"]["held_out"])
     unknown = held.head(2).assign(neighborhood=["nowhere", None])
     assert np.isfinite(T.predict_from_model(m, unknown)).all()
 
@@ -296,6 +313,7 @@ def test_card_compares_the_model_with_simple_rules():
     body = T.card_body(res["model"], res["held_out"]["price"].to_numpy(), res["held_pred"], base)
     assert "This model" in body and "Area × neighborhood median" in body
     assert body.count("**yes**") == 1
+    assert "Version 1 (price in billions" in body and "second look" in body
 
 
 # --- artifacts on disk ---------------------------------------------------------
@@ -312,13 +330,16 @@ def test_model_json_keys_and_finite_numbers(model):
     assert model["unit"] == "billion toman"
     assert model["date_range"] == {"start": "2024-05", "end": "2024-12"}
     assert set(model["cost"]) == {"train", "selection", "held_out"}
+    assert set(model["cost_billions"]) == {"train", "selection", "held_out"}
+    assert model["version"] == 2 and model["target"] == "log_price"
+    assert model["previous_version"]["target"] == "price"
     assert set(model["rows"]) == {"train", "selection", "held_out"}
     assert set(model["hyperparameters"]) == {"alpha", "lambda", "iterations"}
     assert set(model["environment"]) == {"python", "numpy", "os"}
     assert set(model["scaling"]) == {"mu", "sigma"}
     assert len(model["weights"]) == len(model["features"]) == len(model["scaling"]["mu"])
-    assert "location" in model["features"] or any(
-        f.startswith("location") for f in model["features"])
+    from training.features import feature_base
+    assert "location" in {feature_base(f) for f in model["features"]}
 
 
 def test_model_json_candidates_justify_the_choice(model):
@@ -347,7 +368,8 @@ def test_model_json_alone_reproduces_held_out_cost(model):
                                                  model["rows"]["held_out"])
     pred = T.predict_from_model(model, held)
     y = held["price"].to_numpy()
-    assert float(np.mean((pred - y) ** 2) / 2) == pytest.approx(model["cost"]["held_out"])
+    assert float(np.mean((np.log(pred) - np.log(y)) ** 2) / 2) == pytest.approx(model["cost"]["held_out"])
+    assert float(np.mean((pred - y) ** 2) / 2) == pytest.approx(model["cost_billions"]["held_out"])
     assert T.plain_gap(y, pred)["median_billions"] == pytest.approx(
         model["held_out_gap"]["median_billions"])
 
@@ -360,7 +382,7 @@ def test_listings_file():
 
 @pytest.mark.parametrize("name", ["listings.json", "funnel.json", "similar.json", "lab-train.json",
                                   "lab-clean.json", "lab-october.json", "lab-heldout.json",
-                                  "neighborhoods.geojson"])
+                                  "lab-logprice.json", "neighborhoods.geojson"])
 def test_no_forbidden_fields(name):
     keys = {k.lower() for k in walk_keys(load(name))}
     assert not keys & FORBIDDEN

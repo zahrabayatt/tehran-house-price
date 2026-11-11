@@ -1,7 +1,12 @@
 /** The trained model as exported to model/model.json. Only fields the site reads are typed. */
 export interface Model {
   version: number;
-  /** Feature names in column order, e.g. "area", "location", "area^2". */
+  /**
+   * What the weighted sum predicts. "log_price": the natural log of the price in billions,
+   * so the estimate is exp of the sum (version 2). "price": the price itself (version 1).
+   */
+  target: 'log_price' | 'price';
+  /** Feature names in column order, e.g. "log(area)", "rooms", "log(area)^2". */
   features: string[];
   weights: number[];
   bias: number;
@@ -13,7 +18,19 @@ export interface Model {
     fallback: number;
   };
   hyperparameters?: { alpha: number; lambda: number; iterations: number };
+  /** Cost with no penalty, on what the model predicts (log prices for version 2). */
   cost?: { train: number; selection: number; held_out: number };
+  /** The same cost on prices in billions, after exp, to compare with version 1. */
+  cost_billions?: { train: number; selection: number; held_out: number };
+  /** The model this one replaced, kept for the record. */
+  previous_version?: {
+    target: string;
+    features: string[];
+    lambda: number;
+    cost_billions: { train: number; selection: number; held_out: number };
+    held_out_gap: { median_billions: number; median_share_of_price: number;
+      p90_billions: number; p90_share_of_price: number };
+  };
   cost_history?: number[];
   cost_history_iterations?: number[];
   /** How far off the model was on listings it never trained on. */
@@ -64,18 +81,9 @@ export interface ApartmentInput {
   storage: boolean | 0 | 1;
 }
 
-export interface Contribution {
-  label: string;
-  /** Billions of toman, relative to the average apartment. */
-  value: number;
-}
-
 export interface Estimate {
-  /** Asking price in billions of toman. Raw model output, never floored. */
+  /** Asking price in billions of toman. */
   total: number;
-  /** The average apartment's price (the bias). baseline + sum of contributions = total. */
-  baseline: number;
-  contributions: Contribution[];
   /** True when total is below 0.5 billion: the model is outside its range. */
   tooSmall: boolean;
   /** True when the neighborhood was blank or unknown and the Tehran-wide median was used. */

@@ -10,7 +10,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 9 of 14</span>
+      <span class="tag">Step 9 of 15</span>
       <h2 id="st">Learning rate</h2>
       <p class="goal">α sets how big each step down the cost is. Race several values on the same 48,332 ads, from the same start, and see which one gets lowest fastest.</p>
 

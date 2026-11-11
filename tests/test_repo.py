@@ -72,6 +72,6 @@ def test_learning_notes_leave_the_authors_words_empty():
 
 def test_readme_numbers_match_the_data_card():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "1.10 billion" in readme and "15.6%" in readme
+    assert "0.82 billion" in readme and "12.1%" in readme and "40.1%" in readme
     card = (ROOT / "docs/DATA_CARD.md").read_text(encoding="utf-8")
-    assert "1.10 billion toman, or 15.6%" in card
+    assert "0.82 billion toman, or 12.1%" in card

@@ -3,7 +3,8 @@
  *
  * The files are written by training/site_data.py: every training ad (lab-train.json), every
  * stored ad before the cleaning limits (lab-clean.json), October's ads (lab-october.json) and
- * the live model's estimate for every held-out ad (lab-heldout.json). Each step asks for its
+ * the live model's estimate for every held-out ad (lab-heldout.json). The October comparison of
+ * price against log price (lab-logprice.json) is written by training/compare_targets.py. Each step asks for its
  * data by the name its design draft used, in the same shape, so the step code is unchanged.
  */
 
@@ -38,10 +39,31 @@ interface HeldoutFile {
   area: number[];
   rooms: number[];
   hood: number[];
+  target: string;
   cost: Record<string, number>;
+  costBillions: Record<string, number>;
   sklearn: Record<string, number>;
   gap: Record<string, number>;
   rowCounts: Record<string, number>;
+  lambda: number;
+  previous: { costBillions: Record<string, number>; gap: Record<string, number> };
+}
+export interface LogPriceFile {
+  month: string;
+  ads: number;
+  candidates: number;
+  approaches: Array<{
+    key: 'price' | 'log_price' | 'log_both';
+    label: string;
+    features: string[];
+    lambda: number;
+    cost_billions: number;
+    median_billions: number;
+    median_share_of_price: number;
+    p90_billions: number;
+    p90_share_of_price: number;
+    quarters: Array<{ from: number; to: number; ads: number; median_share: number }>;
+  }>;
 }
 
 const cache = new Map<string, Promise<unknown>>();
@@ -143,10 +165,12 @@ const SOURCES: Record<string, () => Promise<unknown>> = {
   'house-heldout.json': async () => {
     const h = await fetchJson<HeldoutFile>('lab-heldout.json');
     return {
-      months: h.months, hoods: h.hoods, cost: h.cost, sklearn: h.sklearn, gap: h.gap, rowsN: h.rowCounts,
+      months: h.months, hoods: h.hoods, cost: h.cost, costBillions: h.costBillions, sklearn: h.sklearn,
+      gap: h.gap, rowsN: h.rowCounts, lambda: h.lambda, previous: h.previous,
       rows: zip(h.estimate, h.asked, h.area, h.rooms, h.hood),
     };
   },
+  'house-logprice.json': () => fetchJson<LogPriceFile>('lab-logprice.json'),
 };
 
 /** The data a step asks for by its draft file name. */

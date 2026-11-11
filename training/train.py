@@ -10,6 +10,16 @@ Run with `python -m training.train`. Order of work, which is the point of this f
 
 Costs are always compared without the lambda penalty, so a large lambda is judged
 on its predictions alone. The penalized cost is only what descent minimizes.
+
+The model predicts log(price), not price (version 2). A cost on prices in billions
+squares the miss in billions, so it serves expensive flats and leaves cheap ones with
+large misses as a share of their price. On the log scale a miss of the same share
+costs the same for every flat. Area and location enter as logs too, so the model is
+a straight line on the log scale: log(price) is close to log(area) plus log(price per m2).
+A prediction is turned back into billions with exp. `cost` and the candidates' costs
+are in log units (what chose the model); `cost_billions` is the same after exp, to
+compare with version 1. training/compare_targets.py reproduces the October comparison
+that led to this change.
 """
 from __future__ import annotations
 
@@ -25,8 +35,8 @@ import numpy as np
 import pandas as pd
 
 from training.experiments import time_dot
-from training.features import (build_matrix, location_lookup, split_by_month,
-                               zscore_apply, zscore_fit)
+from training.features import (build_matrix, feature_base, location_lookup,
+                               split_by_month, zscore_apply, zscore_fit)
 from training.model import compute_cost, gradient_descent
 from training.prep import COORD_COLUMNS, RAW, run_clean
 
@@ -36,29 +46,35 @@ DATA_DIR = ROOT / "web" / "public" / "data"
 CARD_PATH = ROOT / "docs" / "DATA_CARD.md"
 
 UNIT = "billion toman"
+TARGET = "log_price"
+MODEL_VERSION = 2
 SEED = 42
-# The largest eigenvalue of X'X/m is 4.4 for the widest candidate, so descent is
-# stable below 2 / 4.4 = 0.45. The smallest is 0.016, and at alpha 0.3 the slowest
-# direction shrinks by 0.995 per update, so 5,000 updates are plenty.
+# The largest eigenvalue of X'X/m is 5.05 for the widest candidate, so descent is
+# stable below 2 / 5.05 = 0.40. log(area) and log(area)^2 move almost together, so the
+# smallest eigenvalue is tiny (0.0009 to 0.002 with both) and 4 of the 100 candidates,
+# the winner among them, have not fully settled after 5,000 updates. Solved exactly
+# with least squares, the same candidate still wins on October (0.046717 against
+# 0.046730), and the winner's held-out cost differs from the exact one by 0.004%.
 ALPHA = 0.3
 ITERATIONS = 5000
 # Penalty scale: lambda/m is the shrink per unit, and m is about 48,000. Below 10
 # lambda would have no visible effect at all.
 LAMBDAS = (0.0, 10.0, 100.0, 1000.0, 10000.0)
 _REST = ("rooms", "age", "parking", "elevator", "storage")
-_FULL = ("area", "location") + _REST
+AREA, LOC = "log(area)", "log(location)"
+_FULL = (AREA, LOC) + _REST
 SUBSETS = (
     # Without location, to show what the neighborhood adds.
-    ("area",),
-    ("area",) + _REST,
+    (AREA,),
+    (AREA,) + _REST,
     # Location with some or all of the other fields.
-    ("location",),
-    ("location", "area"),
-    ("location", "age"),
-    ("location", "rooms", "age"),
-    ("location", "parking", "elevator", "storage"),
-    ("location", "age", "parking", "elevator", "storage"),
-    ("location",) + _REST,
+    (LOC,),
+    (LOC, AREA),
+    (LOC, "age"),
+    (LOC, "rooms", "age"),
+    (LOC, "parking", "elevator", "storage"),
+    (LOC, "age", "parking", "elevator", "storage"),
+    (LOC,) + _REST,
     _FULL,
     # Leave one field out of the full set.
     tuple(f for f in _FULL if f != "rooms"),
@@ -66,14 +82,27 @@ SUBSETS = (
     tuple(f for f in _FULL if f != "parking"),
     tuple(f for f in _FULL if f != "elevator"),
     tuple(f for f in _FULL if f != "storage"),
-    # Engineered squared terms.
-    ("location", "location^2"),
-    ("location", "location^2") + _REST,
-    _FULL + ("area^2",),
-    _FULL + ("location^2",),
-    _FULL + ("area^2", "location^2"),
+    # Engineered squared terms, squares of the logs.
+    (LOC, LOC + "^2"),
+    (LOC, LOC + "^2") + _REST,
+    _FULL + (AREA + "^2",),
+    _FULL + (LOC + "^2",),
+    _FULL + (AREA + "^2", LOC + "^2"),
 )
 CANDIDATES = tuple((s, lam) for s in SUBSETS for lam in LAMBDAS)
+
+# Version 1 predicted price in billions. Its held-out result is kept for the record,
+# from model.json at commit 8faa60b. Version 2 was chosen on October alone; its November
+# and December numbers are a second look at months version 1 had already used.
+VERSION_1 = {
+    "target": "price", "trained_at": "2026-11-03",
+    "features": ["area", "location", "rooms", "age", "parking", "elevator", "storage",
+                 "area^2", "location^2"],
+    "lambda": 100.0,
+    "cost_billions": {"train": 16.0745, "selection": 17.0441, "held_out": 18.2830},
+    "held_out_gap": {"median_billions": 1.1016, "median_share_of_price": 0.1557,
+                     "p90_billions": 5.7411, "p90_share_of_price": 0.5852},
+}
 
 HISTORY_POINTS = 120
 CONVERGED_RELATIVE = 1e-7  # cost change over the last 100 updates
@@ -109,7 +138,7 @@ def fit_candidate(train: pd.DataFrame, features, lambda_: float, alpha: float,
     X = build_matrix(train, lookup, fallback, features)
     mu, sigma = zscore_fit(X)
     Z = zscore_apply(X, mu, sigma)
-    y = train["price"].to_numpy(dtype=float)
+    y = log_price(train)
     w, b, history = gradient_descent(Z, y, np.zeros(Z.shape[1]), 0.0, alpha, iterations,
                                      lambda_)
     return {"features": features, "lambda": lambda_, "lookup": lookup, "fallback": fallback,
@@ -117,16 +146,38 @@ def fit_candidate(train: pd.DataFrame, features, lambda_: float, alpha: float,
             "diverged": len(history) < iterations}
 
 
-def predict_fit(fit: dict, df: pd.DataFrame) -> np.ndarray:
+# lab:log_price
+def log_price(df: pd.DataFrame) -> np.ndarray:
+    """What the model learns to predict: the natural log of the price in billions."""
+    return np.log(df["price"].to_numpy(dtype=float))
+
+
+def predict_log(fit: dict, df: pd.DataFrame) -> np.ndarray:
     X = build_matrix(df, fit["lookup"], fit["fallback"], fit["features"])
     return zscore_apply(X, fit["mu"], fit["sigma"]) @ fit["w"] + fit["b"]
 
 
+def predict_fit(fit: dict, df: pd.DataFrame) -> np.ndarray:
+    """Prices in billions: exp of the predicted log price."""
+    return np.exp(predict_log(fit, df))
+
+
 def plain_cost(fit: dict, df: pd.DataFrame) -> float:
-    """Cost with no penalty, so candidates compare on predictions alone."""
+    """Cost on log prices with no penalty, so candidates compare on predictions alone."""
     X = build_matrix(df, fit["lookup"], fit["fallback"], fit["features"])
-    return compute_cost(zscore_apply(X, fit["mu"], fit["sigma"]),
-                        df["price"].to_numpy(dtype=float), fit["w"], fit["b"], 0.0)
+    return compute_cost(zscore_apply(X, fit["mu"], fit["sigma"]), log_price(df),
+                        fit["w"], fit["b"], 0.0)
+
+
+def cost_in_billions(y, pred) -> float:
+    """The version 1 cost, on prices in billions, so the two versions can be compared."""
+    e = np.asarray(pred, dtype=float) - np.asarray(y, dtype=float)
+    return float(e @ e / (2 * len(e)))
+# endlab
+
+
+def billions_cost(fit: dict, df: pd.DataFrame) -> float:
+    return cost_in_billions(df["price"].to_numpy(dtype=float), predict_fit(fit, df))
 
 
 def _converged(history: list[float]) -> bool:
@@ -187,8 +238,8 @@ def sklearn_costs(fit: dict, train: pd.DataFrame, held: pd.DataFrame) -> dict:
         X = build_matrix(df, fit["lookup"], fit["fallback"], fit["features"])
         return zscore_apply(X, fit["mu"], fit["sigma"])
 
-    Z, y = matrix(train), train["price"].to_numpy(dtype=float)
-    Z_held, y_held = matrix(held), held["price"].to_numpy(dtype=float)
+    Z, y = matrix(train), log_price(train)
+    Z_held, y_held = matrix(held), log_price(held)
 
     def cost(est):
         est.fit(Z, y)
@@ -213,7 +264,7 @@ def predict_from_model(model: dict, df: pd.DataFrame) -> np.ndarray:
     X = build_matrix(df, model["location"]["lookup"], model["location"]["fallback"],
                      model["features"])
     Z = zscore_apply(X, np.array(model["scaling"]["mu"]), np.array(model["scaling"]["sigma"]))
-    return Z @ np.array(model["weights"]) + model["bias"]
+    return np.exp(Z @ np.array(model["weights"]) + model["bias"])
 
 
 def train_model(df: pd.DataFrame, candidates=CANDIDATES, alpha: float = ALPHA,
@@ -235,7 +286,8 @@ def train_model(df: pd.DataFrame, candidates=CANDIDATES, alpha: float = ALPHA,
 
     its, hist = _downsample(final["history"])
     model = {
-        "version": 1,
+        "version": MODEL_VERSION,
+        "target": TARGET,
         "features": final["features"],
         "weights": final["w"].tolist(),
         "bias": final["b"],
@@ -245,6 +297,10 @@ def train_model(df: pd.DataFrame, candidates=CANDIDATES, alpha: float = ALPHA,
         "cost": {"train": plain_cost(final, train),
                  "selection": plain_cost(final, selection),
                  "held_out": held_cost},
+        "cost_billions": {"train": billions_cost(final, train),
+                          "selection": billions_cost(final, selection),
+                          "held_out": cost_in_billions(held["price"].to_numpy(dtype=float),
+                                                       held_pred)},
         "sklearn_cost": sk,
         "cost_history": hist,
         "cost_history_iterations": its,
@@ -257,6 +313,7 @@ def train_model(df: pd.DataFrame, candidates=CANDIDATES, alpha: float = ALPHA,
         "environment": {"python": platform.python_version(), "numpy": np.__version__,
                         "os": platform.platform()},
         "candidates": records,
+        "previous_version": VERSION_1,
     }
     return {"model": model,
             "train": train, "selection": selection, "held_out": held,
@@ -279,7 +336,7 @@ def pick_listings(held: pd.DataFrame, n: int = LISTING_COUNT, seed: int = SEED) 
 
 def build_profile(df: pd.DataFrame, raw: pd.DataFrame, model: dict) -> dict:
     """Numbers for the Data page. No row-level values."""
-    used = set(model["features"]) | {"price"}
+    used = {feature_base(f) for f in model["features"]} | {"price"}
     months = [{"month": m, "rows": len(g),
                "median_price_per_m2": round(float(g["price_per_m2"].median()), 2),
                "median_price": round(float(g["price"].median()), 2)}
@@ -338,35 +395,44 @@ def update_card(path: Path, body: str) -> None:
 
 
 def card_body(model: dict, y_held, held_pred, baselines: dict) -> str:
-    hp, cost, gap, sk = (model["hyperparameters"], model["cost"], model["held_out_gap"],
-                         model["sklearn_cost"])
+    hp, cost, cb, gap, sk = (model["hyperparameters"], model["cost"], model["cost_billions"],
+                             model["held_out_gap"], model["sklearn_cost"])
+    v1 = model["previous_version"]
     lines = [
         "### Chosen model and held-out result (generated)",
+        "",
+        "Target: the natural log of the asking price in billions. An estimate is exp of the "
+        "model's output, so it is always above zero.",
         "",
         f"Features: `{', '.join(model['features'])}`. Lambda {hp['lambda']:g}, "
         f"alpha {hp['alpha']:g}, {hp['iterations']:,} updates. "
         f"Rows: {model['rows']['train']:,} train, {model['rows']['selection']:,} selection, "
         f"{model['rows']['held_out']:,} held-out.",
         "",
-        "| Cost, no penalty (billion toman squared, halved) | Value |",
-        "|---|---|",
-        f"| Train | {cost['train']:.4f} |",
-        f"| Selection, 2024-10 | {cost['selection']:.4f} |",
-        f"| Held-out, 2024-11 and 2024-12 | {cost['held_out']:.4f} |",
+        "| Cost, no penalty | On log prices (what chose the model) | On prices in billions, after exp (billion toman squared, halved) |",
+        "|---|---|---|",
+        f"| Train | {cost['train']:.4f} | {cb['train']:.4f} |",
+        f"| Selection, 2024-10 | {cost['selection']:.4f} | {cb['selection']:.4f} |",
+        f"| Held-out, 2024-11 and 2024-12 | {cost['held_out']:.4f} | {cb['held_out']:.4f} |",
+        f"| scikit-learn LinearRegression, same features, held-out | "
+        f"{sk['linear_regression']:.4f} | |",
     ]
-    lines.append(f"| scikit-learn LinearRegression, same features, held-out | "
-                 f"{sk['linear_regression']:.4f} |")
     if "ridge" in sk:
-        lines.append(f"| scikit-learn Ridge, same features and lambda, held-out | {sk['ridge']:.4f} |")
+        lines.append(f"| scikit-learn Ridge, same features and lambda, held-out | {sk['ridge']:.4f} | |")
     lines += [
         "",
-        "How far off on held-out listings, with simpler rules for comparison. "
-        "None of these rows fed into any choice.",
+        "How far off on held-out listings, with version 1 and simpler rules for comparison. "
+        "Version 2 was chosen on October alone. Version 1 had already been scored on these "
+        "months, so the version 2 row is a second look at them. None of the other rows fed "
+        "into any choice.",
         "",
-        "| Predictor | Cost | Median gap (billions) | Median gap (share of price) | 90th percentile gap (billions) | 90th percentile gap (share) |",
+        "| Predictor | Cost in billions | Median gap (billions) | Median gap (share of price) | 90th percentile gap (billions) | 90th percentile gap (share) |",
         "|---|---|---|---|---|---|",
     ]
-    rows = [("This model", {"cost": cost["held_out"], **gap})] + list(baselines.items())
+    rows = [("This model (version 2, log price)", {"cost": cb["held_out"], **gap}),
+            (f"Version 1 (price in billions, trained {v1['trained_at']})",
+             {"cost": v1["cost_billions"]["held_out"], **v1["held_out_gap"]})]
+    rows += list(baselines.items())
     for name, g in rows:
         lines.append(f"| {name} | {g['cost']:.4f} | {g['median_billions']:.2f} | {g['median_share_of_price']:.1%} | "
                      f"{g['p90_billions']:.2f} | {g['p90_share_of_price']:.1%} |")
@@ -381,20 +447,18 @@ def card_body(model: dict, y_held, held_pred, baselines: dict) -> str:
         name = f"{lo} to {hi}" if math.isfinite(hi) else f"{lo} and up"
         lines.append(f"| {name} | {int(m.sum()):,} | {g['median_billions']:.2f} | "
                      f"{g['median_share_of_price']:.1%} | {float(np.median(p[m] - y[m])):+.2f} |")
-    neg = int((p <= 0).sum())
-    lines += ["", f"Held-out predictions at or below zero: {neg:,} of {len(p):,}.", "",
-              "### All candidates tried (generated)", "",
+    lines += ["", "### All candidates tried (generated)", "",
               f"Every candidate used alpha {hp['alpha']:g} and {hp['iterations']:,} updates. "
-              "Sorted by selection cost, the only thing that decided the choice. "
+              "Sorted by selection cost on log prices, the only thing that decided the choice. "
               "\"Settled\" means the cost moved by under one part in ten million over the last 100 updates.",
-              "", "| Features | Lambda | Selection cost | Train cost | Settled | Chosen |",
+              "", "| Features | Lambda | Selection cost (log) | Train cost (log) | Settled | Chosen |",
               "|---|---|---|---|---|---|"]
     ok = sorted((c for c in model["candidates"] if c["selection_cost"] is not None),
                 key=lambda c: c["selection_cost"])
     bad = [c for c in model["candidates"] if c["selection_cost"] is None]
     for c in ok:
-        lines.append(f"| {', '.join(c['features'])} | {c['lambda']:g} | {c['selection_cost']:.4f} | "
-                     f"{c['train_cost']:.4f} | {'yes' if c['converged'] else 'no'} | "
+        lines.append(f"| {', '.join(c['features'])} | {c['lambda']:g} | {c['selection_cost']:.5f} | "
+                     f"{c['train_cost']:.5f} | {'yes' if c['converged'] else 'no'} | "
                      f"{'**yes**' if c['chosen'] else ''} |")
     for c in bad:
         lines.append(f"| {', '.join(c['features'])} | {c['lambda']:g} | diverged | diverged | no | |")

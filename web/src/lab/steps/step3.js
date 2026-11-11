@@ -9,7 +9,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 3 of 14</span>
+      <span class="tag">Step 3 of 15</span>
       <h2 id="st">The model</h2>
       <p class="goal">The simplest model is a straight line. Drag its two handles, or the sliders, and click any ad to see what the line predicts for it.</p>
       <div class="split">

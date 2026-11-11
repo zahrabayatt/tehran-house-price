@@ -11,6 +11,7 @@ function bad(why: string): never {
 export function assertModel(data: unknown): asserts data is Model {
   const m = data as Partial<Model> | null;
   if (typeof m !== 'object' || m === null) bad('not an object');
+  if (m.target !== 'log_price' && m.target !== 'price') bad('target');
   if (!Array.isArray(m.features) || m.features.length === 0
       || !m.features.every((f) => typeof f === 'string')) bad('features');
   const n = m.features.length;

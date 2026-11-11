@@ -78,6 +78,31 @@ def test_build_matrix_order_and_powers():
         build_matrix(df, {}, 1.0, ["bogus"])
 
 
+def test_log_features_take_the_log_before_the_power():
+    df = frame(["a"] * 2, [50.0, 50.0], area=80.0)
+    X = build_matrix(df, {"a": 50.0}, 50.0, ["log(area)", "log(location)", "log(area)^2"])
+    assert X[0, 0] == pytest.approx(np.log(80.0))
+    assert X[0, 1] == pytest.approx(np.log(80.0 * 50.0 / 1000))
+    assert X[0, 2] == pytest.approx(np.log(80.0) ** 2)
+
+
+def test_feature_names_parse_and_bad_ones_are_refused():
+    from training.features import feature_base, parse_feature
+    assert parse_feature("log(area)^2") == ("area", True, 2)
+    assert parse_feature("location") == ("location", False, 1)
+    assert feature_base("log(location)") == "location"
+    df = frame(["a"] * 2, [50.0, 50.0], area=80.0)
+    for bad in ["log(bogus)", "log(area", "area^0", "area^x", "log()"]:
+        with pytest.raises(ValueError):
+            build_matrix(df, {"a": 50.0}, 50.0, [bad])
+
+
+def test_log_of_zero_is_refused():
+    df = frame(["a"] * 2, [50.0, 50.0], area=80.0).assign(age=[0, 3])
+    with pytest.raises(ValueError, match="at or below zero"):
+        build_matrix(df, {"a": 50.0}, 50.0, ["log(age)"])
+
+
 def test_split_order():
     months = [f"2024-{m:02d}" for m in range(5, 13)]
     df = pd.concat([frame(["a"] * 3, [1.0] * 3, month=m) for m in months],

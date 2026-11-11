@@ -10,7 +10,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 12 of 14</span>
+      <span class="tag">Step 12 of 15</span>
       <h2 id="st">Overfitting</h2>
       <p class="goal">A low training cost is not the goal. The goal is good prices for ads the model has never seen. Fit a curve to a few ads, then check it on the next month's ads.</p>
 

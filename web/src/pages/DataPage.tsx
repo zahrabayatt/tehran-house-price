@@ -78,7 +78,7 @@ export function DataPage() {
   const steps = funnelSteps();
   const total = steps[0].rows;
   const clean = steps[steps.length - 1].rows;
-  const { gap, simpleRule } = summary;
+  const { gap, simpleRule, previousGap } = summary;
   const shown = Array.from({ length: Math.min(PAGE, listings.length) }, (_, i) => listings[(start + i) % listings.length]);
   const values = profile.months.map((m) => m.median_price_per_m2);
 
@@ -153,8 +153,17 @@ export function DataPage() {
           <summary>Compared with a simple rule</summary>
           <p className="dsmall">
             "Area times the neighborhood's median price per m²" misses a typical ad by {pct(simpleRule.median_share_of_price)}
-            {simpleRule.median_share_of_price < gap.median_share_of_price ? ', slightly less than the model' : ', more than the model'}.
-            The model was chosen before this comparison, and it does better on the most expensive apartments. This is reported as it came out.
+            {simpleRule.median_share_of_price < gap.median_share_of_price ? ', less than the model' : ', more than the model'}.
+            The model was chosen before this comparison. This is reported as it came out.
+          </p>
+        </details>
+        <details>
+          <summary>Compared with the first version</summary>
+          <p className="dsmall" data-testid="version-1">
+            Version 1 of the model learned the price in billions and missed a typical ad by {pct(previousGap.median_share_of_price)};
+            one in ten was off by more than {pct(previousGap.p90_share_of_price)}. This version learns the log of the price, so a 10% miss
+            counts the same on a cheap and a dear flat (Model Lab, step 14): {pct(gap.median_share_of_price)} and {pct(gap.p90_share_of_price)}.
+            It was chosen on October's ads alone, but version 1 had already been tested on these months, so this is a second look at them.
           </p>
         </details>
       </section>

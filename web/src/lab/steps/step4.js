@@ -10,7 +10,7 @@ export const html = `<div id="main" class="skel" aria-busy="true">
     </div>
     <div class="live">
     <section class="card" aria-labelledby="st">
-      <span class="tag">Step 4 of 14</span>
+      <span class="tag">Step 4 of 15</span>
       <h2 id="st">Cost function</h2>
       <p class="goal">One number for how wrong a line is. Move the line on the left, or the dot on the cost map on the right: they are the same w and b.</p>
       <div class="two">

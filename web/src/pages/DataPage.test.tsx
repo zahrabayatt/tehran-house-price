@@ -29,7 +29,12 @@ describe('DataPage', () => {
 
   it('states the typical miss from the model and pages through real test ads', () => {
     page();
-    expect(screen.getByTestId('typical-miss').textContent).toContain('15.6%');
+    expect(screen.getByTestId('typical-miss').textContent).toContain('12.1%');
+    // version 1 is kept for the record, with the second look at the test months said plainly
+    const v1 = screen.getByTestId('version-1').textContent;
+    expect(v1).toContain('15.6%');
+    expect(v1).toContain('58.5%');
+    expect(v1).toContain('second look');
     const table = screen.getByRole('table', { name: 'Real test ads' });
     const first = within(table).getAllByRole('row')[1].textContent;
     expect(first).toContain(listings[0].neighborhood);

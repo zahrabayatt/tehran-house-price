@@ -114,7 +114,10 @@ def test_lab_files_have_one_value_per_ad():
     assert len(t["examples"]) == 3
     h = load("lab-heldout.json")
     assert all(len(h[k]) == MODEL["rows"]["held_out"] for k in ("estimate", "asked", "area", "rooms", "hood"))
-    assert h["cost"]["held_out"] == pytest.approx(MODEL["cost"]["held_out"], abs=1e-3)
+    assert h["cost"]["held_out"] == pytest.approx(MODEL["cost"]["held_out"], abs=1e-5)
+    assert h["costBillions"]["held_out"] == pytest.approx(MODEL["cost_billions"]["held_out"], abs=1e-3)
+    assert h["target"] == "log_price" and h["previous"]["costBillions"]["held_out"] > 0
+    assert min(h["estimate"]) > 0   # exp of the model's output is never zero or below
     o = load("lab-october.json")
     assert len(o["area"]) == len(o["price"]) == MODEL["rows"]["selection"]
 

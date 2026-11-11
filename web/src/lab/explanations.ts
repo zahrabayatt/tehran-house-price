@@ -219,9 +219,29 @@ export const EXPLANATIONS: Record<string, Record<string, string>> = {
     '    return train, sel, held': '',
   },
 
+  log_price: {
+    'def log_price(df: pd.DataFrame) -> np.ndarray:': 'The number the model learns to predict.',
+    '    """What the model learns to predict: the natural log of the price in billions."""': 'Not the price itself: its natural log.',
+    '    return np.log(df["price"].to_numpy(dtype=float))': 'np.log works on every price at once. Every price is above zero, so every log exists.',
+    'def predict_log(fit: dict, df: pd.DataFrame) -> np.ndarray:': 'The model as in steps 8 to 13: a weighted sum of scaled features.',
+    '    X = build_matrix(df, fit["lookup"], fit["fallback"], fit["features"])': 'Build the features, such as log(area) and log(location), in training order.',
+    '    return zscore_apply(X, fit["mu"], fit["sigma"]) @ fit["w"] + fit["b"]': 'Scale with the training mean and spread, then w · x + b. The answer is a log price.',
+    'def predict_fit(fit: dict, df: pd.DataFrame) -> np.ndarray:': 'The estimate people see, in billions of toman.',
+    '    """Prices in billions: exp of the predicted log price."""': 'exp undoes log: exp(log(p)) = p.',
+    '    return np.exp(predict_log(fit, df))': 'exp of any number is above zero, so no estimate can be zero or negative.',
+    'def plain_cost(fit: dict, df: pd.DataFrame) -> float:': 'The cost that trains and chooses the model.',
+    '    """Cost on log prices with no penalty, so candidates compare on predictions alone."""': 'Measured on the log ruler, where the same share of miss costs the same for every flat.',
+    '    return compute_cost(zscore_apply(X, fit["mu"], fit["sigma"]), log_price(df),': 'The step 4 cost, unchanged. Only the target changed: log prices in place of prices.',
+    '                        fit["w"], fit["b"], 0.0)': 'λ = 0 here: candidates are judged on their predictions alone.',
+    'def cost_in_billions(y, pred) -> float:': 'The old ruler, kept only to compare with version 1.',
+    '    """The version 1 cost, on prices in billions, so the two versions can be compared."""': 'Version 1 predicted prices directly and was judged on this cost.',
+    '    e = np.asarray(pred, dtype=float) - np.asarray(y, dtype=float)': 'The miss in billions for every ad.',
+    '    return float(e @ e / (2 * len(e)))': 'Squared, summed, divided by 2m: the step 4 cost on prices.',
+  },
+
   evaluate_held_out: {
     'def evaluate_held_out(fit: dict, held: pd.DataFrame) -> tuple[float, dict, np.ndarray]:': 'The check on listings the model never saw.',
     '    pred = predict_fit(fit, held)': 'Predict with the already fixed model. Scaling uses the training mu and sigma.',
-    '    return plain_cost(fit, held), plain_gap(held["price"].to_numpy(dtype=float), pred), pred': 'The cost with no penalty, the plain-language gap, and the predictions. Reported once.',
+    '    return plain_cost(fit, held), plain_gap(held["price"].to_numpy(dtype=float), pred), pred': 'The cost on log prices with no penalty, the plain-language gap in billions and percent, and the predictions.',
   },
 };

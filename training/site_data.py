@@ -92,8 +92,12 @@ def lab_heldout(held: pd.DataFrame, pred: np.ndarray, names: dict[str, str], mod
         "estimate": _col(pred, 2), "asked": _col(held["price"], 2),
         "area": _col(held["area"], 1), "rooms": [int(v) for v in held["rooms"]],
         "hood": [index.get(s, -1) for s in held["neighborhood"]],
-        "cost": {k: round(v, 3) for k, v in model["cost"].items()},
-        "sklearn": {k: round(v, 3) for k, v in model["sklearn_cost"].items()},
+        "target": model["target"],
+        "cost": {k: round(v, 5) for k, v in model["cost"].items()},
+        "costBillions": {k: round(v, 3) for k, v in model["cost_billions"].items()},
+        "sklearn": {k: round(v, 5) for k, v in model["sklearn_cost"].items()},
+        "previous": {"costBillions": model["previous_version"]["cost_billions"],
+                     "gap": model["previous_version"]["held_out_gap"]},
         "gap": model["held_out_gap"], "rowCounts": model["rows"],
         "lambda": model["hyperparameters"]["lambda"],
         "lambdaTried": sorted({c["lambda"] for c in model["candidates"]}),
@@ -101,14 +105,15 @@ def lab_heldout(held: pd.DataFrame, pred: np.ndarray, names: dict[str, str], mod
 
 
 def data_summary(held: pd.DataFrame, feature_map: dict, model: dict) -> dict:
-    """Small numbers for the Data page: the model's typical miss, the simple rule it is compared
-    with, and map counts."""
+    """Small numbers for the Data page: the model's typical miss, the simple rule and version 1
+    it is compared with, and map counts."""
     lookup, fallback = model["location"]["lookup"], model["location"]["fallback"]
     y = held["price"].to_numpy(dtype=float)
     rule = location_feature(held, lookup, fallback)   # area x neighborhood median per m2, no training
     priced = [f for f in feature_map["features"] if "ppm2" in f["properties"]]
     return {"gap": model["held_out_gap"], "heldOut": model["rows"]["held_out"],
             "simpleRule": {k: round(float(v), 4) for k, v in plain_gap(y, rule).items()},
+            "previousGap": model["previous_version"]["held_out_gap"],
             "neighborhoodsWithPrice": len(priced), "neighborhoods": len(feature_map["features"])}
 
 
