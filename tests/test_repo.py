@@ -10,11 +10,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 REQUIRED = [
     "README.md",
-    "docs/PROJECT_SPEC.md",
-    "docs/LEARNING_NOTES.md",
     "docs/DATA_CARD.md",
     "docs/CHANGELOG.md",
-    "docs/LEARNING_PROGRESS_TRACKER.md",
     ".github/workflows/ci.yml",
     ".github/workflows/pages.yml",
 ]
@@ -52,22 +49,15 @@ def test_pages_deploys_only_after_ci_succeeds_on_main():
     assert "deploy-pages" in text and "upload-pages-artifact" in text
 
 
-def test_tracker_and_changelog():
-    tracker = (ROOT / "docs/LEARNING_PROGRESS_TRACKER.md").read_text(encoding="utf-8")
-    assert "tehran-air-risk" in tracker
-    assert "2026-11-03" in tracker
+def test_changelog():
     changelog = (ROOT / "docs/CHANGELOG.md").read_text(encoding="utf-8")
     assert re.search(r"1\.0\.0.*2026-11-03", changelog)
 
 
-def test_learning_notes_leave_the_authors_words_empty():
-    notes = (ROOT / "docs/LEARNING_NOTES.md").read_text(encoding="utf-8")
-    sections = re.split(r"^## ", notes, flags=re.MULTILINE)[1:]
-    assert len(sections) >= 10
-    for s in sections:
-        assert "### In my own words" in s, s.splitlines()[0]
-        after = s.split("### In my own words", 1)[1].strip()
-        assert after == "", f"{s.splitlines()[0]}: the author's section must stay empty"
+def test_private_notes_stay_out_of_the_repo():
+    """The spec, study notes and progress tracker are kept outside this public repository."""
+    for name in ["PROJECT_SPEC.md", "LEARNING_NOTES.md", "LEARNING_PROGRESS_TRACKER.md"]:
+        assert not (ROOT / "docs" / name).exists(), name
 
 
 def test_readme_numbers_match_the_data_card():
